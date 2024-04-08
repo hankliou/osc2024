@@ -3,6 +3,10 @@
 .global _start
 
 _start:
+    bl from_el2_to_el1
+    ADR x1, exception_vector_table
+    MSR vbar_el1, x1
+
 setup_stack:
     ldr     x1, =_stack_top
     mov     sp, x1
@@ -23,3 +27,11 @@ run_main:
 proc_hang:
     wfe
     b       proc_hang
+
+from_el2_to_el1:
+    mov x1, (1 << 31) // EL1 uses aarch64
+    msr hcr_el2, x1
+    mov x1, 0x345 // EL1h (SPSel = 1) with interrupt disabled
+    msr spsr_el2, x1
+    msr elr_el2, lr
+    eret // return to EL1
