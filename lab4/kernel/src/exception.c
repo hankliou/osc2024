@@ -1,7 +1,7 @@
 #include "exception.h"
 #include "bcm2837/rpi_irq.h"
 #include "bcm2837/rpi_uart1.h"
-#include "heap.h"
+#include "memory.h"
 #include "timer.h"
 #include "uart1.h"
 
@@ -68,7 +68,7 @@ void el1_interrupt_disable() {
 
 void add_irq_task(void *callback, unsigned priority) {
     // init node
-    irq_node *node = malloc(sizeof(irq_node));
+    irq_node *node = simple_malloc(sizeof(irq_node));
     node->next = irq_head;
     node->prev = irq_head;
     node->priority = priority;

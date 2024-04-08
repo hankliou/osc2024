@@ -1,7 +1,7 @@
 #ifndef _SHELL_H_
 #define _SHELL_H_
 
-#define CLI_MAX_CMD 12
+#define CLI_MAX_CMD 13
 #define CMD_MAX_LEN 128
 #define MSG_MAX_LEN 128
 
@@ -22,10 +22,11 @@ void do_cmd_help();
 void do_cmd_hello();
 void do_cmd_info();
 void do_cmd_ls(char *);
-void do_cmd_malloc();
+void do_cmd_simple_malloc();
 void do_cmd_reboot();
 void do_cmd_set2sTimer(char *msg);
 void do_cmd_setTimer(char *msg, int sec);
 void do_cmd_testAsyncUart();
+void do_cmd_mem_test();
 
 #endif /* _SHELL_H_ */

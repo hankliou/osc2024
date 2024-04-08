@@ -1,15 +1,16 @@
 #include "shell.h"
 #include "cpio.h"
 #include "dtb.h"
-#include "heap.h"
 #include "mbox.h"
+#include "memory.h"
 #include "power.h"
 #include "timer.h"
 #include "u_string.h"
 #include "uart1.h"
 
 extern char *dtb_ptr;
-void *CPIO_DEFAULT_PLACE; // root of ramfs
+void *CPIO_DEFAULT_START; // root of ramfs
+void *CPIO_DEFAULT_END;   // end addressl of ramfs
 
 struct CLI_CMDS cmd_list[CLI_MAX_CMD] = {
     {.command = "cat", .help = "see the file content"},
@@ -19,24 +20,24 @@ struct CLI_CMDS cmd_list[CLI_MAX_CMD] = {
     {.command = "help", .help = "print all available commands"},
     {.command = "info", .help = "get device information via mailbox"},
     {.command = "ls", .help = "list directory contents"},
-    {.command = "malloc", .help = "simple allocator in heap session"},
+    {.command = "simple_malloc", .help = "simple allocator in heap session"},
     {.command = "reboot", .help = "reboot the device"},
     {.command = "setTimer", .help = "setTimer [msg] [second]"},
     {.command = "set2sAlert", .help = "set a 2s timer"},
     {.command = "testAsyncUart", .help = "will echo your input by async UART"},
+    {.command = "mem_test", .help = "lazy testing kmalloc and kfree"},
 };
 
 void do_cmd_exec(char *filepath) {
     char *c_filepath;
     char *c_filedata;
     unsigned int c_filesize;
-    struct cpio_newc_header *header_ptr = CPIO_DEFAULT_PLACE;
+    struct cpio_newc_header *header_ptr = CPIO_DEFAULT_START;
 
     // traverse the whole ramdisk, check filename one by one
     while (header_ptr != 0) {
         // function return -1 when error
-        int error = cpio_newc_parse_header(header_ptr, &c_filepath, &c_filesize,
-                                           &c_filedata, &header_ptr);
+        int error = cpio_newc_parse_header(header_ptr, &c_filepath, &c_filesize, &c_filedata, &header_ptr);
         if (error) {
             uart_puts("cpio parse error");
             break;
@@ -45,15 +46,12 @@ void do_cmd_exec(char *filepath) {
         // if match
         if (strcmp(c_filepath, filepath) == 0) {
             // exec c_filedata
-            char *ustack = malloc(256);
-            asm volatile("msr spsr_el1, %0" ::"r"(
-                0x3c0)); // set state to user mode, and enable interrupt
-            asm volatile("msr elr_el1, %0;" ::"r"(
-                c_filedata)); // set exception return addr to 'c_filedata'(any
-                              // addr may be ok)
-            asm volatile("msr sp_el0, %0;" ::"r"(
-                ustack + 256));    // set el0's sp to top of new stack
-            asm volatile("eret;"); // switch EL to 0
+            char *ustack = simple_malloc(256);
+            asm volatile("msr spsr_el1, %0" ::"r"(0x3c0));       // set state to user mode, and enable interrupt
+            asm volatile("msr elr_el1, %0;" ::"r"(c_filedata));  // set exception return addr to 'c_filedata'(any
+                                                                 // addr may be ok)
+            asm volatile("msr sp_el0, %0;" ::"r"(ustack + 256)); // set el0's sp to top of new stack
+            asm volatile("eret;");                               // switch EL to 0
 
             break;
         }
@@ -91,8 +89,8 @@ void cli_cmd_read(char *buffer) {
         if (idx >= CMD_MAX_LEN)
             break;
 
-        // c = uart_async_getc();
-        c = uart_recv();
+        c = uart_async_getc();
+        // c = uart_recv();
         if (c == '\n') {
             uart_puts("\r\n");
             break;
@@ -135,8 +133,8 @@ void cli_cmd_exec(char *buffer) {
         do_cmd_help();
     } else if (strcmp(cmd, "info") == 0) {
         do_cmd_info();
-    } else if (strcmp(cmd, "malloc") == 0) {
-        do_cmd_malloc();
+    } else if (strcmp(cmd, "simple_malloc") == 0) {
+        do_cmd_simple_malloc();
     } else if (strcmp(cmd, "ls") == 0) {
         do_cmd_ls(argvs);
     } else if (strcmp(cmd, "exec") == 0) {
@@ -150,8 +148,10 @@ void cli_cmd_exec(char *buffer) {
         do_cmd_setTimer(argvs, atoi(sec));
     } else if (strcmp(cmd, "testAsyncUart") == 0) {
         do_cmd_testAsyncUart();
+    } else if (strcmp(cmd, "mem_test") == 0) {
+        do_cmd_mem_test();
     } else {
-        uart_puts("%s : command not found", cmd);
+        uart_puts("%s : command not found\n", cmd);
     }
 }
 
@@ -186,13 +186,12 @@ void do_cmd_cat(char *filepath) {
     char *c_filepath;
     char *c_filedata;
     unsigned int c_filesize;
-    struct cpio_newc_header *header_ptr = CPIO_DEFAULT_PLACE;
+    struct cpio_newc_header *header_ptr = CPIO_DEFAULT_START;
 
     // traverse the whole ramdisk, check filename one by one
     while (header_ptr != 0) {
         // func return -1 when error
-        int error = cpio_newc_parse_header(header_ptr, &c_filepath, &c_filesize,
-                                           &c_filedata, &header_ptr);
+        int error = cpio_newc_parse_header(header_ptr, &c_filepath, &c_filesize, &c_filedata, &header_ptr);
         if (error) {
             uart_puts("cpio parse error");
             break;
@@ -265,16 +264,16 @@ void do_cmd_info() {
     }
 }
 
-void do_cmd_malloc() {
-    char *test1 = malloc(0x18);
+void do_cmd_simple_malloc() {
+    char *test1 = simple_malloc(0x18);
     memcpy(test1, "test malloc1", sizeof("test amlloc1"));
     uart_puts("%s\n", test1);
 
-    char *test2 = malloc(0x20);
+    char *test2 = simple_malloc(0x20);
     memcpy(test2, "test malloc2", sizeof("test amlloc2"));
     uart_puts("%s\n", test2);
 
-    char *test3 = malloc(0x28);
+    char *test3 = simple_malloc(0x28);
     memcpy(test3, "test malloc3", sizeof("test amlloc3"));
     uart_puts("%s\n", test3);
 }
@@ -283,11 +282,10 @@ void do_cmd_ls(char *dir) {
     char *c_filepath;
     char *c_filedata;
     unsigned int c_filesize;
-    struct cpio_newc_header *header_ptr = CPIO_DEFAULT_PLACE;
+    struct cpio_newc_header *header_ptr = CPIO_DEFAULT_START;
 
     while (header_ptr != 0) {
-        int error = cpio_newc_parse_header(header_ptr, &c_filepath, &c_filesize,
-                                           &c_filedata, &header_ptr);
+        int error = cpio_newc_parse_header(header_ptr, &c_filepath, &c_filesize, &c_filedata, &header_ptr);
         if (error) {
             uart_puts("cpio parse error");
             break;
@@ -312,12 +310,65 @@ void do_cmd_set2sTimer(char *msg) {
     long long int cntpct_el0, cntfrq_el0;
     asm volatile("mrs %0, cntpct_el0\n\t" : "=r"(cntpct_el0));
     asm volatile("mrs %0, cntfrq_el0\n\t" : "=r"(cntfrq_el0));
-    uart_sendline("[Interrupt][el1_irq][%s] %d seconds after booting\n", msg,
-                  cntpct_el0 / cntfrq_el0);
+    uart_sendline("[Interrupt][el1_irq][%s] %d seconds after booting\n", msg, cntpct_el0 / cntfrq_el0);
 
     add_timer(do_cmd_set2sTimer, msg, 2);
 }
 
 void do_cmd_setTimer(char *msg, int sec) {
     add_timer(timer_print_msg, msg, sec);
+}
+
+void do_cmd_mem_test() {
+    char *p1 = kmalloc(0x820);
+    char *p2 = kmalloc(0x900);
+    char *p3 = kmalloc(0x2000);
+    char *p4 = kmalloc(0x3900);
+    kfree(p3);
+    kfree(p4);
+    kfree(p1);
+    kfree(p2);
+    char *a = kmalloc(0x10);
+    char *b = kmalloc(0x100);
+    char *c = kmalloc(0x1000);
+
+    kfree(a);
+    kfree(b);
+    kfree(c);
+
+    a = kmalloc(32);
+    char *aa = kmalloc(50);
+    b = kmalloc(64);
+    char *bb = kmalloc(64);
+    c = kmalloc(128);
+    char *cc = kmalloc(129);
+    char *d = kmalloc(256);
+    char *dd = kmalloc(256);
+    char *e = kmalloc(512);
+    char *ee = kmalloc(999);
+
+    char *f = kmalloc(0x2000);
+    char *ff = kmalloc(0x2000);
+    char *g = kmalloc(0x2000);
+    char *gg = kmalloc(0x2000);
+    char *h = kmalloc(0x2000);
+    char *hh = kmalloc(0x2000);
+
+    kfree(a);
+    kfree(aa);
+    kfree(b);
+    kfree(bb);
+    kfree(c);
+    kfree(cc);
+    kfree(dd);
+    kfree(d);
+    kfree(e);
+    kfree(ee);
+
+    kfree(f);
+    kfree(ff);
+    kfree(g);
+    kfree(gg);
+    kfree(h);
+    kfree(hh);
 }

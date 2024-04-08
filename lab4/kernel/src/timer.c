@@ -1,12 +1,12 @@
 #include "timer.h"
-#include "heap.h"
+#include "memory.h"
 #include "u_string.h"
 #include "uart1.h"
 
 timer_node *timer_head; // head is empty, every node come after head
 
 void timer_list_init() {
-    timer_head = malloc(sizeof(timer_node));
+    timer_head = simple_malloc(sizeof(timer_node));
     timer_head->next = timer_head;
     timer_head->prev = timer_head;
 }
@@ -61,7 +61,7 @@ void timer_handler() {
 
 void add_timer(void *callback, char *msg, unsigned long long timeout) {
     // init node
-    timer_node *node = malloc(sizeof(timer_node));
+    timer_node *node = simple_malloc(sizeof(timer_node));
     node->next = timer_head;
     node->prev = timer_head;
     node->callback = callback;
@@ -70,7 +70,7 @@ void add_timer(void *callback, char *msg, unsigned long long timeout) {
     asm volatile("mrs %0, cntfrq_el0" : "=r"(freq));
     node->interrupt_time = timeout * freq + tick;
     node->msg =
-        malloc(strlen(msg) + 1); // need to free when times up(in timer_handler)
+        simple_malloc(strlen(msg) + 1); // need to free when times up(in timer_handler)
     strcpy(node->msg, msg);
 
     // insert node into list

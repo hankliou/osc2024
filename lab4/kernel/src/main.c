@@ -1,6 +1,6 @@
 #include "dtb.h"
 #include "exception.h"
-#include "heap.h"
+#include "memory.h"
 #include "shell.h"
 #include "timer.h"
 #include "u_string.h"
@@ -28,9 +28,11 @@ void main(char *arg) {
     uart_puts("Loading dtb from: 0x%x\n", arg);
     cli_print_banner();
 
+    allocator_init();
+
     while (1) {
         cli_cmd_clear(input_buffer, CMD_MAX_LEN);
-        uart_puts("\n# ");
+        uart_puts("# ");
         cli_cmd_read(input_buffer);
         cli_cmd_exec(input_buffer);
     }
