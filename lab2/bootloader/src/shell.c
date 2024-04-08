@@ -1,14 +1,43 @@
 #include "../include/shell.h"
-#include "../include/mbox.h"
 #include "../include/power.h"
 #include "../include/uart1.h"
+#include "../include/utils.h"
+
+extern char *_dtb;
+extern char _start[];
 
 struct CLI_CMDS cmd_list[CLI_MAX_CMD] = {
 	/* data */
-	{.command = "hello", .help = "print Hello World!"},
+	{.command = "loadimg", .help = "load image via uart1"},
 	{.command = "help", .help = "print all available commands"},
-	{.command = "info", .help = "get device information via mailbox"},
 	{.command = "reboot", .help = "reboot the device"}};
+
+/* Overwite image file into _start */
+void do_cmd_loadimg()
+{
+	char *bak_dtb = _dtb;
+	char c;
+	unsigned long long kernel_size = 0;
+	char *kernel_start = (char *)(&_start);
+
+	uart_puts("Please upload the image file.\r\n");
+
+	for (int i = 0; i < 8; i++)
+	{ // get the size of kernel(long long int -> 64 bits, binary)
+		c = uart_getc();
+		kernel_size += c << (i * 8);
+	}
+	for (int i = 0; i < kernel_size; i++)
+	{ // load kernel
+		c = uart_getc();
+		kernel_start[i] = c;
+	}
+	uart_puts("Image file downloaded successfully.\r\n");
+	uart_puts("Point to new kernel ...\r\n");
+
+	// it's a function call, calling the function located at kernel_start with param "bak_dtb"
+	((void (*)(char *))kernel_start)(bak_dtb);
+}
 
 int cli_cmd_strcmp(const char *p1, const char *p2)
 {
@@ -60,17 +89,13 @@ void cli_cmd_read(char *buffer)
 
 void cli_cmd_exec(char *buffer)
 {
-	if (cli_cmd_strcmp(buffer, "hello") == 0)
+	if (cli_cmd_strcmp(buffer, "loadimg") == 0)
 	{
-		do_cmd_hello();
+		do_cmd_loadimg();
 	}
 	else if (cli_cmd_strcmp(buffer, "help") == 0)
 	{
 		do_cmd_help();
-	}
-	else if (cli_cmd_strcmp(buffer, "info") == 0)
-	{
-		do_cmd_info();
 	}
 	else if (cli_cmd_strcmp(buffer, "reboot") == 0)
 	{
@@ -85,8 +110,8 @@ void cli_cmd_exec(char *buffer)
 
 void cli_print_banner()
 {
-	uart_puts("=======================================\r\n");
-	uart_puts("  Welcome to NYCU-OSC 2024 Lab1 Shell  \r\n");
+	uart_puts("\n=======================================\r\n");
+	uart_puts("  Welcome to NYCU-OSC 2024 Lab2 Shell  \r\n");
 	uart_puts("=======================================\r\n");
 }
 
@@ -106,51 +131,9 @@ void do_cmd_hello()
 	uart_puts("Hello World!\r\n");
 }
 
-void do_cmd_info()
-{
-	// mailbox functional check, get hardware info
-	// print hw revision
-	pt[0] = 8 * 4;
-	pt[1] = MBOX_REQUEST_PROCESS;
-	pt[2] = MBOX_TAG_GET_BOARD_REVISION;
-	pt[3] = 4;
-	pt[4] = MBOX_TAG_REQUEST_CODE;
-	pt[5] = 0;
-	pt[6] = 0;
-	pt[7] = MBOX_TAG_LAST_BYTE;
-
-	if (mbox_call(MBOX_TAGS_ARM_TO_VC, (unsigned int)((unsigned long)&pt)))
-	{
-		uart_puts("Hardware Revision\t: ");
-		// uart_2hex(pt[6]);
-		uart_2hex(pt[5]);
-		uart_puts("\r\n");
-	}
-
-	// print arm memory
-	pt[0] = 8 * 4;
-	pt[1] = MBOX_REQUEST_PROCESS;
-	pt[2] = MBOX_TAG_GET_ARM_MEMORY;
-	pt[3] = 8;
-	pt[4] = MBOX_TAG_REQUEST_CODE;
-	pt[5] = 0;
-	pt[6] = 0;
-	pt[7] = MBOX_TAG_LAST_BYTE;
-
-	if (mbox_call(MBOX_TAGS_ARM_TO_VC, (unsigned int)((unsigned long)&pt)))
-	{
-		uart_puts("ARM Memory Base Address\t: ");
-		uart_2hex(pt[5]);
-		uart_puts("\r\n");
-		uart_puts("ARM Memory Size\t\t: ");
-		uart_2hex(pt[6]);
-		uart_puts("\r\n");
-	}
-}
-
 void do_cmd_reboot()
 {
-	uart_puts("Rebooting ...\r\n\r\n");
+	uart_puts("Reboot in 5 seconds ...\r\n\r\n");
 	volatile unsigned int *rst_addr = (unsigned int *)PM_RSTC;
 	*rst_addr = PM_PASSWORD | 0x20;
 	volatile unsigned int *wdg_addr = (unsigned int *)PM_WDOG;
