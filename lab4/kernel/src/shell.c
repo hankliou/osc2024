@@ -178,7 +178,7 @@ void do_cmd_testAsyncUart() {
 
 void cli_print_banner() {
     uart_puts("=======================================\r\n");
-    uart_puts("  Welcome to NYCU-OSC 2024 Lab3 Shell  \r\n");
+    uart_puts("  Welcome to NYCU-OSC 2024 Lab4 Shell  \r\n");
     uart_puts("=======================================\r\n");
 }
 
