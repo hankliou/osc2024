@@ -28,7 +28,8 @@ uint32_t uint32_endian_big2little(uint32_t data) {
 void traverse_device_tree(void *dtb_ptr, dtb_callback callback) {
     struct fdt_header *header = dtb_ptr;
     if (uint32_endian_big2little(header->magic) != 0xD00DFEED) {
-        uart_puts("Traverse_device_tree : wrong magic in traverse_device_tree");
+        uart_sendline(
+            "Traverse_device_tree : wrong magic in traverse_device_tree");
         return;
     }
 
@@ -95,7 +96,7 @@ void traverse_device_tree(void *dtb_ptr, dtb_callback callback) {
 
         // if current node undefinded
         else {
-            uart_puts("error type: %x\n", token_type);
+            uart_sendline("error type: %x\n", token_type);
             return;
         }
     }
@@ -106,21 +107,21 @@ void dtb_callback_show_tree(uint32_t node_type, char *name, void *value,
     static int level = 0; // tabs depth
     if (node_type == FDT_BEGIN_NODE) {
         for (int i = 0; i < level; i++) { // print tabs
-            uart_puts("  ");
+            uart_sendline("  ");
         }
-        uart_puts("%s{\n", name);
+        uart_sendline("%s{\n", name);
         level++;
     } else if (node_type == FDT_END_NODE) {
         level--;
         for (int i = 0; i < level; i++) {
-            uart_puts("  ");
+            uart_sendline("  ");
         }
-        uart_puts("}\n");
+        uart_sendline("}\n");
     } else if (node_type == FDT_PROP) {
         for (int i = 0; i < level; i++) {
-            uart_puts("  ");
+            uart_sendline("  ");
         }
-        uart_puts("%s\n", name);
+        uart_sendline("%s\n", name);
     }
 }
 

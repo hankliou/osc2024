@@ -38,7 +38,7 @@ void do_cmd_exec(char *filepath) {
         int error = cpio_newc_parse_header(header_ptr, &c_filepath, &c_filesize,
                                            &c_filedata, &header_ptr);
         if (error) {
-            uart_puts("cpio parse error");
+            uart_sendline("cpio parse error");
             break;
         }
 
@@ -60,7 +60,7 @@ void do_cmd_exec(char *filepath) {
 
         // if meet TRAILER!!! (last file)
         if (header_ptr == 0)
-            uart_puts("cat: %s: No such file or directory.\n", filepath);
+            uart_sendline("cat: %s: No such file or directory.\n", filepath);
     }
 }
 
@@ -94,7 +94,7 @@ void cli_cmd_read(char *buffer) {
         // c = uart_async_getc();
         c = uart_recv();
         if (c == '\n') {
-            uart_puts("\r\n");
+            uart_sendline("\r\n");
             break;
         }
         if (c > 16 && c < 32)
@@ -151,13 +151,16 @@ void cli_cmd_exec(char *buffer) {
     } else if (strcmp(cmd, "testAsyncUart") == 0) {
         do_cmd_testAsyncUart();
     } else {
-        uart_puts("%s : command not found", cmd);
+        uart_sendline("%s : command not found", cmd);
     }
 }
 
 void do_cmd_testAsyncUart() {
     while (1) {
-        uart_sendline("type 'q' to quit\n");
+        int i = 150;
+        while (i--)
+            asm volatile("nop\n\t");
+        uart_sendline("\ntype 'q' to quit\n");
         char buffer[CMD_MAX_LEN];
         int idx = 0;
         while (idx < CMD_MAX_LEN) {
@@ -176,10 +179,20 @@ void do_cmd_testAsyncUart() {
     }
 }
 
+// void do_cmd_testAsyncUart() {
+//     uart_sendline("type 'q' to quit\n");
+//     while (1) {
+//         char t = uart_async_getc();
+//         if (t == 'q')
+//             break;
+//         uart_async_putc(t);
+//     }
+// }
+
 void cli_print_banner() {
-    uart_puts("=======================================\r\n");
-    uart_puts("  Welcome to NYCU-OSC 2024 Lab3 Shell  \r\n");
-    uart_puts("=======================================\r\n");
+    uart_sendline("=======================================\r\n");
+    uart_sendline("  Welcome to NYCU-OSC 2024 Lab3 Shell  \r\n");
+    uart_sendline("=======================================\r\n");
 }
 
 void do_cmd_cat(char *filepath) {
@@ -194,21 +207,21 @@ void do_cmd_cat(char *filepath) {
         int error = cpio_newc_parse_header(header_ptr, &c_filepath, &c_filesize,
                                            &c_filedata, &header_ptr);
         if (error) {
-            uart_puts("cpio parse error");
+            uart_sendline("cpio parse error");
             break;
         }
 
         if (strcmp(c_filepath, filepath) == 0) {
-            uart_puts("%s", c_filedata);
+            uart_sendline("%s", c_filedata);
             break;
         }
 
         // if is TRAILER!!!
         if (header_ptr == 0) {
-            uart_puts("cat: %s: No such file or directory", filepath);
+            uart_sendline("cat: %s: No such file or directory", filepath);
         }
     }
-    uart_puts("\n");
+    uart_sendline("\n");
 }
 
 void do_cmd_dtb() {
@@ -217,15 +230,15 @@ void do_cmd_dtb() {
 
 void do_cmd_help() {
     for (int i = 0; i < CLI_MAX_CMD; i++) {
-        uart_puts(cmd_list[i].command);
-        uart_puts("\t\t: ");
-        uart_puts(cmd_list[i].help);
-        uart_puts("\r\n");
+        uart_sendline(cmd_list[i].command);
+        uart_sendline("\t\t: ");
+        uart_sendline(cmd_list[i].help);
+        uart_sendline("\r\n");
     }
 }
 
 void do_cmd_hello() { // hello
-    uart_puts("Hello World!\r\n");
+    uart_sendline("Hello World!\r\n");
 }
 
 void do_cmd_info() {
@@ -240,10 +253,10 @@ void do_cmd_info() {
     pt[7] = MBOX_TAG_LAST_BYTE;
 
     if (mbox_call(MBOX_TAGS_ARM_TO_VC, (unsigned int)((unsigned long)&pt))) {
-        uart_puts("Hardware Revision\t: ");
+        uart_sendline("Hardware Revision\t: ");
         uart_2hex(pt[6]);
         uart_2hex(pt[5]);
-        uart_puts("\r\n");
+        uart_sendline("\r\n");
     }
     // print arm memory
     pt[0] = 8 * 4;
@@ -256,27 +269,27 @@ void do_cmd_info() {
     pt[7] = MBOX_TAG_LAST_BYTE;
 
     if (mbox_call(MBOX_TAGS_ARM_TO_VC, (unsigned int)((unsigned long)&pt))) {
-        uart_puts("ARM Memory Base Address\t: ");
+        uart_sendline("ARM Memory Base Address\t: ");
         uart_2hex(pt[5]);
-        uart_puts("\r\n");
-        uart_puts("ARM Memory Size\t\t: ");
+        uart_sendline("\r\n");
+        uart_sendline("ARM Memory Size\t\t: ");
         uart_2hex(pt[6]);
-        uart_puts("\r\n");
+        uart_sendline("\r\n");
     }
 }
 
 void do_cmd_malloc() {
     char *test1 = malloc(0x18);
     memcpy(test1, "test malloc1", sizeof("test amlloc1"));
-    uart_puts("%s\n", test1);
+    uart_sendline("%s\n", test1);
 
     char *test2 = malloc(0x20);
     memcpy(test2, "test malloc2", sizeof("test amlloc2"));
-    uart_puts("%s\n", test2);
+    uart_sendline("%s\n", test2);
 
     char *test3 = malloc(0x28);
     memcpy(test3, "test malloc3", sizeof("test amlloc3"));
-    uart_puts("%s\n", test3);
+    uart_sendline("%s\n", test3);
 }
 
 void do_cmd_ls(char *dir) {
@@ -289,18 +302,18 @@ void do_cmd_ls(char *dir) {
         int error = cpio_newc_parse_header(header_ptr, &c_filepath, &c_filesize,
                                            &c_filedata, &header_ptr);
         if (error) {
-            uart_puts("cpio parse error");
+            uart_sendline("cpio parse error");
             break;
         }
 
         if (header_ptr != 0) {
-            uart_puts("%s\n", c_filepath);
+            uart_sendline("%s\n", c_filepath);
         }
     }
 }
 
 void do_cmd_reboot() {
-    uart_puts("Reboot in 5 seconds ...\r\n\r\n");
+    uart_sendline("Reboot in 5 seconds ...\r\n\r\n");
     volatile unsigned int *rst_addr = (unsigned int *)PM_RSTC;
     *rst_addr = PM_PASSWORD | 0x20;
     volatile unsigned int *wdg_addr = (unsigned int *)PM_WDOG;

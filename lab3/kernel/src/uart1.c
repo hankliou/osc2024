@@ -75,24 +75,6 @@ void uart_send(char c) {
     *AUX_MU_IO_REG = c;
 }
 
-int uart_puts(char *fmt, ...) {
-    __builtin_va_list args;
-    __builtin_va_start(args, fmt);
-    char buf[VSPRINT_MAX_BUF_SIZE];
-
-    char *str = (char *)buf;
-    int count = vsprintf(str, fmt, args);
-
-    while (*str) {
-        if (*str == '\n')
-            uart_send('\r');
-        uart_send(*str++);
-    }
-
-    __builtin_va_end(args);
-    return count;
-}
-
 void uart_2hex(unsigned int d) {
     unsigned int n;
     int c;
