@@ -52,7 +52,7 @@ void timer_handler() {
         free(node->msg);
         free(node);
     }
-    // if list is empty, postpond the timer
+    // if list is not empty re-new timer, else postpond the timer
     if (timer_head->next != timer_head)
         set_timer_interrupt_by_tick(timer_head->next->interrupt_time);
     else
@@ -93,13 +93,14 @@ void timer_print_msg(char *msg) {
     uart_sendline("%s\n", msg);
 }
 
-// set timer [expire_time] from now (abs)
+// set timer [expire_time] from now (related)
 void set_timer_interrupt(unsigned long long expire_time) {
     asm volatile("mrs x1, cntfrq_el0\n\t");
     asm volatile("mul x1, x1, %0\n\t" : "=r"(expire_time));
     asm volatile("msr cntp_cval_el0, x1\n\t");
 }
 
+// set timer [expire_time] from now (abs)
 void set_timer_interrupt_by_tick(unsigned long long time) {
     asm volatile("msr cntp_cval_el0, %0" : "=r"(time));
 }
