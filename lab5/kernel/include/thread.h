@@ -2,6 +2,8 @@
 #define _THREAD_H_
 
 #define MAXPID 32678 // Linux kernel defined limit 2^15
+#define USTACK_SIZE 0x10000
+#define KSTACK_SIZE 0x10000
 
 typedef struct thread_context {
     // callee saved registers
@@ -25,18 +27,18 @@ typedef struct thread_context {
 typedef struct thread {
     struct thread *next;
     struct thread *prev;
-    char *data;                     // ??
-    unsigned int datasize;          // ??
-    int iszombie;                   // zombie flag
-    int pid;                        // process id
-    int isused;                     // ??
-    char *stack_alloced_ptr;        // ??
-    char *kernel_stack_alloced_ptr; // ??
-    thread_context context;         // context(registers) need to store
+    char *data;              // ??
+    unsigned int datasize;   // ??
+    int iszombie;            // zombie flag
+    int pid;                 // process id
+    int isused;              // ??
+    char *private_stack_ptr; // ??
+    char *kernel_stack_ptr;  // ??
+    thread_context context;  // context(registers) need to store
 } thread;
 
 void init_thread();
-thread *thread_create(void *func); // runable function
-void foo();                        // test function
+thread *thread_create(void *funcion_start_point); // runable function
+void foo();                                       // test function
 
 #endif /* _THREAD_H_ */
