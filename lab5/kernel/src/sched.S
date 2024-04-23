@@ -1,3 +1,4 @@
+// arm32 pass args by x0 ~ x3, if more than 4 args, pass by stack
 .global switch_to
 switch_to: // called with 2 param, (prev, next) = (x0, x1)
     stp x19, x20, [x0, 16 * 0]
@@ -20,6 +21,7 @@ switch_to: // called with 2 param, (prev, next) = (x0, x1)
     msr tpidr_el1, x1
     ret
 
+// x0: return value
 .global get_current
 get_current:
     mrs x0, tpidr_el1

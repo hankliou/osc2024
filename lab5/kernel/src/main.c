@@ -2,6 +2,7 @@
 #include "exception.h"
 #include "memory.h"
 #include "shell.h"
+#include "thread.h"
 #include "timer.h"
 #include "u_string.h"
 #include "uart1.h"
@@ -29,6 +30,7 @@ void main(char *arg) {
     cli_print_banner();
 
     allocator_init();
+    init_thread();
 
     while (1) {
         cli_cmd_clear(input_buffer, CMD_MAX_LEN);

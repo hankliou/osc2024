@@ -39,6 +39,10 @@ typedef struct thread {
 
 void init_thread();
 thread *thread_create(void *funcion_start_point); // runable function
+void schedule();                                  // switch to next job
+void idle();                                      // keep scheduling
+void thread_exit();                               // mark thread 'zombie'
+void kill_zombie();                               // remove zombie process
 void foo();                                       // test function
 
 #endif /* _THREAD_H_ */

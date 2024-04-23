@@ -4,6 +4,7 @@
 #include "mbox.h"
 #include "memory.h"
 #include "power.h"
+#include "thread.h"
 #include "timer.h"
 #include "u_string.h"
 #include "uart1.h"
@@ -26,6 +27,7 @@ struct CLI_CMDS cmd_list[CLI_MAX_CMD] = {
     {.command = "set2sAlert", .help = "set a 2s timer"},
     {.command = "testAsyncUart", .help = "will echo your input by async UART"},
     {.command = "mem_test", .help = "lazy testing kmalloc and kfree"},
+    {.command = "thread_test", .help = "test threads interleaving"},
 };
 
 void do_cmd_exec(char *filepath) {
@@ -150,6 +152,8 @@ void cli_cmd_exec(char *buffer) {
         do_cmd_testAsyncUart();
     } else if (strcmp(cmd, "mem_test") == 0) {
         do_cmd_mem_test();
+    } else if (strcmp(cmd, "thread_test") == 0) {
+        do_cmd_thread_test();
     } else {
         uart_puts("%s : command not found\n", cmd);
     }
@@ -371,4 +375,11 @@ void do_cmd_mem_test() {
     kfree(gg);
     kfree(h);
     kfree(hh);
+}
+
+void do_cmd_thread_test() {
+    for (int i = 0; i < 5; i++) {
+        uart_sendline("testing: %d\n", thread_create(foo)->pid);
+    }
+    idle();
 }

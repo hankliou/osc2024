@@ -1,16 +1,29 @@
 #include "thread.h"
 #include "../include/memory.h"
+#include "uart1.h"
+
+extern int switch_to();
+extern int get_current();
 
 static int pid_cnt = 0;
-thread *run_queue;
-thread thread_list[MAXPID + 1];
+static thread *run_queue;
+static thread thread_list[MAXPID + 1];
+static thread *cur_thread;
 
 void init_thread() {
     // TODO: lock
     // init 'thread_list' & 'run_queue'
     run_queue = kmalloc(sizeof(thread));
-    run_queue = run_queue->next = run_queue;
+    run_queue->next = run_queue;
     run_queue->prev = run_queue;
+
+    for (int i = 0; i <= MAXPID; i++) {
+        thread_list[i].isused = 0;
+        thread_list[i].iszombie = 0;
+        thread_list[i].pid = i;
+    }
+    // asm volatile("msr tpidr_el1, %0" ::"r"(kmalloc(sizeof(thread)))); // Don't let thread structure NULL as we enable the functionality
+    cur_thread = thread_create(idle);
 
     // TODO: unlock
 }
@@ -45,4 +58,64 @@ thread *thread_create(void *funcion_start_point) {
 
     // TODO: unlock
     return the_thread;
+}
+
+void schedule() {
+    // TODO: lock
+    for (thread *t = run_queue->next; t != run_queue; t = t->next)
+        uart_sendline("tid: %d", t->pid);
+    uart_sendline("\n========================\n");
+    // find a job to schedule, otherwise spinning til found
+    do {
+        cur_thread = cur_thread->next;
+    } while (cur_thread == run_queue);
+
+    // context switch (defined in asm)
+    // pass both thread's addr as base addr, to load/store the registers
+    switch_to(get_current(), &cur_thread->context);
+
+    // TODO: unlock
+}
+
+void idle() {
+    while (1) {
+        kill_zombie();
+        schedule();
+    }
+}
+
+void thread_exit() {
+    // TODO: lock
+    cur_thread->iszombie = 1;
+    // TODO: unlock
+    schedule();
+}
+
+void kill_zombie() {
+    // TODO:lock
+    // BUG!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    for (thread *cur = run_queue->next; cur != run_queue; cur = cur->next) {
+        if (cur->iszombie) {
+            // remove from list
+            cur->next->prev = cur->prev;
+            cur->prev->next = cur->next;
+            // release memory
+            kfree(cur->kernel_stack_ptr);
+            kfree(cur->private_stack_ptr);
+            // update thread status
+            cur->isused = 0;
+            cur->iszombie = 0;
+        }
+    }
+
+    // TODO:unlock
+}
+
+void foo() {
+    for (int i = 0; i < 10; ++i) {
+        uart_sendline("Thread id: %d %d\n", cur_thread->pid, i);
+        for (int j = 0; j < 1000000; j++)
+            asm volatile("nop\n\t");
+        schedule();
+    }
 }

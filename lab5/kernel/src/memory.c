@@ -82,7 +82,7 @@ void allocator_init() {
         free_slot_list[i].prev = &free_slot_list[i];
     }
 
-    dump_free_frame_list();
+    // dump_free_frame_list();
 
     // start up allocation
     uart_sendline("Buddy system usable memory from 0x%x to 0x%x\n", ALLOCATION_BASE, ALLOCATION_END);
@@ -94,14 +94,14 @@ void allocator_init() {
     memory_reserve((unsigned long long)&_start, (unsigned long long)&_end); // kernel image (stack, heap included)
     uart_sendline("\nCPIO_DEFAULT_START ~ CPIO_DEFAULT_END:");
     memory_reserve((unsigned long long)CPIO_DEFAULT_START, (unsigned long long)CPIO_DEFAULT_END); // initramfs
-    dump_free_frame_list();
+    // dump_free_frame_list();
 }
 
 // size: Byte
 void *page_malloc(unsigned int size) {
     // calculate least frame size needed
     int needed_frame = (size >> PAGE_LEVEL) + ((size & (0xFFF)) > 0);
-    uart_sendline("Request size: %d B (%d frames)\n", size, needed_frame);
+    // uart_sendline("Request size: %d B (%d frames)\n", size, needed_frame);
 
     size = needed_frame; // turn size into frame (4KB = 2^12 bytes)
     void *allocated_addr = NULL;
@@ -110,7 +110,7 @@ void *page_malloc(unsigned int size) {
     for (int i = 0;; i++) {
         // failed
         if (i > MAX_PAGE_EXP) {
-            uart_sendline("page malloc failed, no space left\n");
+            // uart_sendline("page malloc failed, no space left\n");
             break;
         }
 
@@ -120,9 +120,9 @@ void *page_malloc(unsigned int size) {
             frame *node = free_frame_list[i].next;
             allocated_addr = (void *)(((uintptr_t)(node->idx) << (PAGE_LEVEL + 3)) + ALLOCATION_BASE);
 
-            uart_sendline("[allocte] From index %d, allocated %d frame with total size "
-                          "%d KB\n",
-                          node->idx, (1 << i), (1 << (i + PAGE_LEVEL - 10)));
+            // uart_sendline("[allocte] From index %d, allocated %d frame with total size "
+            //               "%d KB\n",
+            //               node->idx, (1 << i), (1 << (i + PAGE_LEVEL - 10)));
 
             // update frame array head (set val to 2^i continuous frame)
             node->val = i;
@@ -139,7 +139,7 @@ void *page_malloc(unsigned int size) {
             break;
         }
     }
-    dump_free_frame_list();
+    // dump_free_frame_list();
     return allocated_addr;
 }
 
@@ -157,9 +157,9 @@ void release_redundant(frame *node, unsigned int size) {
         // add buddy to free frame list
         insert_frame_node(buddy, &free_frame_list[node->val]);
 
-        uart_sendline("[release] From index %d, released %d frame with total size %d "
-                      "KB\n",
-                      buddy->idx, (1 << node->val), (1 << (node->val + PAGE_LEVEL - 10)));
+        // uart_sendline("[release] From index %d, released %d frame with total size %d "
+        //               "KB\n",
+        //               buddy->idx, (1 << node->val), (1 << (node->val + PAGE_LEVEL - 10)));
     }
 }
 
@@ -168,8 +168,8 @@ void page_free(void *ptr) {
     // get the target in array: (addr - base) / 8(byte) / 4096(frame size)
     frame *page_frame_ptr = &frame_array[((unsigned long long)ptr - ALLOCATION_BASE) >> (PAGE_LEVEL + 3)];
 
-    uart_sendline("[Free] From index %d, released %d frame with total size %d KB\n", page_frame_ptr->idx, (1 << page_frame_ptr->val),
-                  (1 << (page_frame_ptr->val + PAGE_LEVEL - 10)));
+    // uart_sendline("[Free] From index %d, released %d frame with total size %d KB\n", page_frame_ptr->idx, (1 << page_frame_ptr->val),
+    //               (1 << (page_frame_ptr->val + PAGE_LEVEL - 10)));
 
     // update tag to 'un-used'
     page_frame_ptr->used = FRAME_FREE_FLAG;
@@ -180,7 +180,7 @@ void page_free(void *ptr) {
     // add whole coalesced frames into free frame list
     insert_frame_node(page_frame_ptr, &free_frame_list[page_frame_ptr->val]);
 
-    dump_free_frame_list();
+    // dump_free_frame_list();
 }
 
 // return 0 if success, return -1 otherwise
@@ -197,7 +197,7 @@ int coalesce(frame **ptr) {
     if (buddy->used != FRAME_FREE_FLAG)
         return -1;
 
-    uart_sendline("[Coalesce] Merge frame %d and frame %d\n", frame_ptr->idx, buddy->idx);
+    // uart_sendline("[Coalesce] Merge frame %d and frame %d\n", frame_ptr->idx, buddy->idx);
 
     // remove buddy from freelist
     buddy->prev->next = buddy->next;
@@ -247,14 +247,14 @@ void cut_page_to_slot(int expo) {
         slot->next->prev = slot;
         slot->prev->next = slot;
     }
-    dump_free_slot_list();
+    // dump_free_slot_list();
 }
 
 // size: byte
 void *dynamic_malloc(unsigned int size) {
     // calculate least frame size needed
     int slot_needed = (size >> SLOT_LEVEL) + ((size & (0x1F)) > 0);
-    uart_sendline("Request size: %d Byte (%d slots) < 4KB\n", size, slot_needed);
+    // uart_sendline("Request size: %d Byte (%d slots) < 4KB\n", size, slot_needed);
     size = slot_needed;
 
     // find the level needed
@@ -264,7 +264,7 @@ void *dynamic_malloc(unsigned int size) {
 
     // if no free slot
     if (free_slot_list[expo].next == &free_slot_list[expo]) {
-        uart_sendline("[Dynamic malloc] no free slot\n");
+        // uart_sendline("[Dynamic malloc] no free slot\n");
         cut_page_to_slot(expo);
     }
 
@@ -274,8 +274,8 @@ void *dynamic_malloc(unsigned int size) {
     it->prev->next = it->next;
     it->next->prev = it->prev;
 
-    uart_sendline("[Dynamic malloc] start from %x, sized %d Byte\n", slot_addr, (1 << expo));
-    dump_free_slot_list();
+    // uart_sendline("[Dynamic malloc] start from %x, sized %d Byte\n", slot_addr, (1 << expo));
+    // dump_free_slot_list();
 
     return slot_addr;
 }
@@ -286,7 +286,7 @@ void dynamic_free(void *ptr) {
     // type trans to re-get 'next', 'prev' field
     frame_slot *slot = (frame_slot *)ptr;
 
-    uart_sendline("[Dynamic free] start from %x, sized %d Byte\n", ptr, (1 << expo) * SLOT_SIZE);
+    // uart_sendline("[Dynamic free] start from %x, sized %d Byte\n", ptr, (1 << expo) * SLOT_SIZE);
 
     // insert
     slot->next = free_slot_list[expo].next;
@@ -294,7 +294,7 @@ void dynamic_free(void *ptr) {
     slot->next->prev = slot;
     slot->prev->next = slot;
 
-    dump_free_slot_list();
+    // dump_free_slot_list();
 }
 
 void dump_free_slot_list() {
