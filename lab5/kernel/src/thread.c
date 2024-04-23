@@ -62,9 +62,6 @@ thread *thread_create(void *funcion_start_point) {
 
 void schedule() {
     // TODO: lock
-    for (thread *t = run_queue->next; t != run_queue; t = t->next)
-        uart_sendline("tid: %d", t->pid);
-    uart_sendline("\n========================\n");
     // find a job to schedule, otherwise spinning til found
     do {
         cur_thread = cur_thread->next;
@@ -93,7 +90,6 @@ void thread_exit() {
 
 void kill_zombie() {
     // TODO:lock
-    // BUG!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     for (thread *cur = run_queue->next; cur != run_queue; cur = cur->next) {
         if (cur->iszombie) {
             // remove from list
@@ -118,4 +114,5 @@ void foo() {
             asm volatile("nop\n\t");
         schedule();
     }
+    thread_exit();
 }
