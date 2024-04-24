@@ -40,6 +40,11 @@ void timer_disable_interrupt() {
 
 void timer_handler() {
     timer_node *node = timer_head->next;
+    uart_sendline("timer interrupt start\n");
+    int i = 5000000;
+    while (i--)
+        asm volatile("nop\n\t");
+
     // list not empyt
     if (timer_head->next != timer_head) {
         // ((ret_type (*)(arg_type)) fptr) (args);
@@ -57,6 +62,8 @@ void timer_handler() {
         set_timer_interrupt_by_tick(timer_head->next->interrupt_time);
     else
         set_timer_interrupt(99999);
+
+    uart_sendline("timer interrupt end\n");
 }
 
 void add_timer(void *callback, char *msg, unsigned long long timeout) {

@@ -12,8 +12,8 @@ ARM Peripherals interrupts table
     6: illegal access type 1
     7: illegal access type 0
 */
-#define UART_IRQ_PRIORITY 1
-#define TIMER_IRQ_PRIORITY 0
+#define UART_IRQ_PRIORITY 0
+#define TIMER_IRQ_PRIORITY 1
 
 typedef struct irq_node {
     struct irq_node *prev;

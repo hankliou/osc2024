@@ -120,6 +120,8 @@ void uart_tx_irq_handler() {
 }
 
 void uart_rx_irq_handler() {
+
+    uart_sendline("rx interrupt start\n");
     // Check if buffer is full
     if ((uart_rx_write + 1) % VSPRINT_MAX_BUF_SIZE == uart_rx_read) {
         uart_rx_irq_disable();
@@ -135,6 +137,8 @@ void uart_rx_irq_handler() {
         uart_rx_write %= VSPRINT_MAX_BUF_SIZE;
     }
     // end critical (rx irq will be enable again in next 'async getc' call)
+
+    uart_sendline("tx interrupt end\n");
 }
 
 void uart_async_putc(char c) {
