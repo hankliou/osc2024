@@ -1,0 +1,171 @@
+#include "dtb.h"
+#include "cpio.h"
+#include "memory.h"
+#include "u_string.h"
+#include "uart1.h"
+#include <stdint.h>
+
+// super good intro web page: https://zhuanlan.zhihu.com/p/144863497
+
+extern void *CPIO_DEFAULT_START;
+extern void *CPIO_DEFAULT_END;
+char *dtb_ptr;
+
+// store in big endian
+struct fdt_header {
+    uint32_t magic;
+    uint32_t total_size;
+    uint32_t off_dt_struct;  // offset from 'header' to 'struct'
+    uint32_t off_dt_strings; // offset from 'header' to 'strings'
+    uint32_t off_mem_rsvmap; // offset from 'header' to 'reserved memory'
+    uint32_t version;
+    uint32_t last_comp_version;
+    uint32_t boot_cpuid_phys;
+    uint32_t size_dt_strings;
+    uint32_t size_dt_struct;
+};
+
+// memory reservation block
+struct fdt_reserve_entry {
+    uint64_t address;
+    uint64_t size;
+};
+
+uint32_t uint32_endian_big2little(uint32_t data) {
+    char *r = (char *)&data;
+    return (r[3] << 0) | (r[2] << 8) | (r[1] << 16) | (r[0] << 24);
+}
+
+uint64_t uint64_endian_big2little(uint64_t data) {
+    char *r = (char *)&data;
+    return ((unsigned long long)r[7] << 0) | (unsigned long long)(r[6] << 8) | ((unsigned long long)r[5] << 16) | ((unsigned long long)r[4] << 24) |
+           ((unsigned long long)r[3] << 32) | ((unsigned long long)r[2] << 40) | ((unsigned long long)r[1] << 48) | ((unsigned long long)r[0] << 56);
+}
+
+void traverse_device_tree(void *dtb_ptr, dtb_callback callback) {
+    struct fdt_header *header = dtb_ptr;
+    if (uint32_endian_big2little(header->magic) != 0xD00DFEED) {
+        uart_sendline("Traverse_device_tree : wrong magic in traverse_device_tree");
+        return;
+    }
+
+    // get device tree size
+    uint32_t struct_size = uint32_endian_big2little(header->size_dt_struct);
+
+    char *dt_struct_ptr = (char *)((char *)header + uint32_endian_big2little(header->off_dt_struct));
+    char *dt_strings_ptr = (char *)((char *)header + uint32_endian_big2little(header->off_dt_strings));
+    char *end = (char *)dt_struct_ptr + struct_size;
+    char *pointer = dt_struct_ptr;
+
+    // traverse device tree's structure
+    while (pointer < end) {
+        // get type of node (pass the address into 'big2little' func)
+        // cause the address stores the type of dt_struct, only need trans
+        // endian
+        uint32_t token_type = uint32_endian_big2little(*(uint32_t *)pointer);
+
+        pointer += 4; // pointer is a char pointer
+
+        // if current node is beginning node
+        if (token_type == FDT_BEGIN_NODE) {
+            callback(token_type, pointer, 0,
+                     0);                                    // pass 'node type' & 'ptr to node'
+            pointer += strlen(pointer);                     // mov pointer to the end of node
+            pointer += 4 - (unsigned long long)pointer % 4; // align to 4-byte
+        }
+
+        // if current node is endding node
+        else if (token_type == FDT_END_NODE) {
+            callback(token_type, 0, 0, 0);
+        }
+
+        // if current node is property node
+        else if (token_type == FDT_PROP) {
+            uint32_t len = uint32_endian_big2little(*(uint32_t *)pointer);                        // get len
+            pointer += 4;                                                                         // mov to begining
+            char *name = (char *)dt_strings_ptr + uint32_endian_big2little(*(uint32_t *)pointer); // get ptr to name
+            pointer += 4;
+            callback(token_type, name, pointer, len);
+            pointer += len;
+
+            // since len might not be multiple of 4, check align
+            if ((unsigned long long)pointer % 4 != 0) {
+                pointer += 4 - (unsigned long long)pointer % 4;
+            }
+        }
+
+        // if current node is NOP
+        else if (token_type == FDT_NOP) {
+            callback(token_type, 0, 0, 0);
+        }
+
+        // if current node is END
+        else if (token_type == FDT_END) {
+            callback(token_type, 0, 0, 0);
+        }
+
+        // if current node undefinded
+        else {
+            uart_sendline("error type: %x\n", token_type);
+            return;
+        }
+    }
+}
+
+void dtb_callback_show_tree(uint32_t node_type, char *name, void *value, uint32_t name_size) {
+    static int level = 0; // tabs depth
+    if (node_type == FDT_BEGIN_NODE) {
+        for (int i = 0; i < level; i++) { // print tabs
+            uart_sendline("  ");
+        }
+        uart_sendline("%s{\n", name);
+        level++;
+    } else if (node_type == FDT_END_NODE) {
+        level--;
+        for (int i = 0; i < level; i++) {
+            uart_sendline("  ");
+        }
+        uart_sendline("}\n");
+    } else if (node_type == FDT_PROP) {
+        for (int i = 0; i < level; i++) {
+            uart_sendline("  ");
+        }
+        uart_sendline("%s\n", name);
+    }
+}
+
+void dtb_callback_initramfs(uint32_t node_type, char *name, void *value, uint32_t name_size) {
+    // https://github.com/stweil/raspberrypi-documentation/blob/master/configuration/device-tree.md
+    // linux,initrd-start will be assigned by start.elf based on config.txt
+    if (node_type == FDT_PROP && strcmp(name, "linux,initrd-start") == 0) {
+        // get initramfs's address, then store it into CPIO_DEFAULT_START
+        CPIO_DEFAULT_START = (void *)(unsigned long long)uint32_endian_big2little(*(uint32_t *)value);
+    }
+    if (node_type == FDT_PROP && strcmp(name, "linux,initrd-end") == 0) {
+        CPIO_DEFAULT_END = (void *)(unsigned long long)uint32_endian_big2little(*(uint32_t *)value);
+    }
+}
+
+void dtb_get_reserved_memory() {
+    struct fdt_header *ptr = (struct fdt_header *)dtb_ptr;
+
+    if (uint32_endian_big2little(ptr->magic) != 0xD00DFEED) {
+        uart_sendline("Bad Magic.\n");
+        return;
+    }
+
+    // jump to 'reserve memory' section
+    char *reserve_entry_ptr = ((char *)ptr + uint32_endian_big2little(ptr->off_mem_rsvmap));
+    struct fdt_reserve_entry *addr_ptr = (struct fdt_reserve_entry *)reserve_entry_ptr;
+
+    // reserve dtb-defined memory segment
+    while (addr_ptr->address != 0 || addr_ptr->size != 0) {
+        unsigned long long start = uint64_endian_big2little(addr_ptr->address);
+        unsigned long long end = uint64_endian_big2little(addr_ptr->address + addr_ptr->size);
+        memory_reserve(start, end);
+        addr_ptr++;
+    }
+
+    // reserve dtb itself
+    memory_reserve((unsigned long long)dtb_ptr, (unsigned long long)(dtb_ptr + uint32_endian_big2little(ptr->total_size)));
+}
