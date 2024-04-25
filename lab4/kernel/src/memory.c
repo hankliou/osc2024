@@ -35,7 +35,7 @@ void free(void *ptr) {
 /* lab 4 */
 extern char _start; // defined in linker
 extern char _end;
-extern char *CPIO_DEFAULT_START; // define in dtb.h
+extern char *CPIO_DEFAULT_START; // define in shell.c and initialize in dtb.h
 extern char *CPIO_DEFAULT_END;
 
 static frame *frame_array;     // store all "frame" status
