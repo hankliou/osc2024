@@ -18,9 +18,8 @@ ARM Peripherals interrupts table
 typedef struct irq_node {
     struct irq_node *prev;
     struct irq_node *next;
-    unsigned long long
-        priority;        // store priority (smaller number is more preemptive)
-    void *task_function; // task function ptr
+    unsigned long long priority; // store priority (smaller number is more preemptive)
+    void *task_function;         // task function ptr
 } irq_node;
 
 void irqtask_list_init();
@@ -31,7 +30,7 @@ void add_irq_task(void *callback, unsigned priority);
 // p16
 #define CORE0_INTERRUPT_SOURCE ((volatile unsigned int *)(0x40000060))
 
-#define INTERRUPT_SOURCE_CNTPNSIRQ                                             \
+#define INTERRUPT_SOURCE_CNTPNSIRQ                                                                                                                   \
     (1 << 1) // physical non-secure, interrupt, counter. often use for physical
              // counter
 #define INTERRUPT_SOURCE_GPU (1 << 8)
@@ -45,5 +44,8 @@ void el1h_irq_router();
 void el0_sync_router();
 
 void invalid_exception_router(); // exception_handler.S
+
+void lock();
+void unlock();
 
 #endif
