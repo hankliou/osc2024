@@ -9,15 +9,13 @@ int mbox_call(mbox_channel_type channel, unsigned int value) {
     value &= ~(0xF);  // get front 28 bits
     value |= channel; // combine with channel
 
-    while ((*MBOX_STATUS & BCM_ARM_VC_MS_FULL) != 0) {
-    }                    // wait until mail box not full
-    *MBOX_WRITE = value; // write to reg
+    while ((*MBOX_STATUS & BCM_ARM_VC_MS_FULL) != 0) {} // wait until mail box not full
+    *MBOX_WRITE = value;                                // write to reg
 
     // read content, check if is equal to the content just wrote
     while (1) {
-        while (*MBOX_STATUS & BCM_ARM_VC_MS_EMPTY) {
-        }                        // wait until mail box not empty
-        if (value == *MBOX_READ) // read from reg
+        while (*MBOX_STATUS & BCM_ARM_VC_MS_EMPTY) {} // wait until mail box not empty
+        if (value == *MBOX_READ)                      // read from reg
             return pt[1] == MOBX_REQUEST_SUCCEED;
     }
     return 0;

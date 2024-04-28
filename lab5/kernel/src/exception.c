@@ -26,8 +26,7 @@ void el0_sync_router() {
     asm volatile("mrs %0, elr_el1" : "=r"(elrel1));
     unsigned long long esrel1;
     asm volatile("mrs %0, esr_el1" : "=r"(esrel1));
-    uart_sendline("spsrel1: %x, elrel1: %x, esr_el1: %x\n", spsrel1, elrel1,
-                  esrel1);
+    uart_sendline("spsrel1: %x, elrel1: %x, esr_el1: %x\n", spsrel1, elrel1, esrel1);
 }
 
 void el1h_irq_router() {
@@ -58,12 +57,19 @@ void invalid_exception_router() {
 
 /* implement preemption */
 void el1_interrupt_enable() {
-    asm volatile(
-        "msr daifclr, 0xf"); // enable all interrupt, 0 is default enable
+    asm volatile("msr daifclr, 0xf"); // enable all interrupt, 0 is default enable
 }
 
 void el1_interrupt_disable() {
     asm volatile("msr daifset, 0xf"); // disable all interrupt, 1 is disable
+}
+
+void lock() {
+    el1_interrupt_disable();
+}
+
+void unlock() {
+    el1_interrupt_enable();
 }
 
 void add_irq_task(void *callback, unsigned priority) {

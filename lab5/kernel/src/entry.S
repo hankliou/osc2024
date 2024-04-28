@@ -125,7 +125,7 @@ el1h_sync:
     //eret
 el1h_irq:
     save_state
-    mov x0,5
+    mov x0, sp
     bl el1h_irq_router
     load_state
     eret
@@ -144,16 +144,16 @@ el1h_error_invalid:
 
 el0_sync_64:
     save_state
-    mov x0,8
+    mov x0, sp
     bl el0_sync_router
     load_state
     eret
 el0_irq_64:
-    //save_state
-    //mov x0,9
-    //bl el0_irq_64_router
-    //load_state
-    //eret
+    save_state
+    mov x0, sp
+    bl el0_irq_64_router
+    load_state
+    eret
 el0_fiq_invalid_64:
     //save_state
     //mov x0,10

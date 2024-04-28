@@ -41,13 +41,18 @@ typedef struct trap_frame {
     unsigned long sp_el0;
 } trap_frame;
 
-int getpid();
-size_t uart_read(char buf[], size_t size);
-size_t uart_write(const char buf[], size_t size);
-int exec(const char *name, char *const argv[]);
-int fork();
+// sys calls
+int getpid(trap_frame *tpf);
+size_t uart_read(trap_frame *tpf, char buf[], size_t size);
+size_t uart_write(trap_frame *tpf, const char buf[], size_t size);
+int exec(trap_frame *tpf, const char *name, char *const argv[]);
+int fork(trap_frame *tpf);
 void exit();
-int mbox_call(unsigned char ch, unsigned int *mbox);
+int mbox_call(trap_frame *tpf, unsigned char ch, unsigned int *mbox);
 void kill(int pid);
+
+// components
+unsigned int get_file_size(char *path);
+unsigned int get_file_start(char *path);
 
 #endif

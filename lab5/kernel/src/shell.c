@@ -49,7 +49,7 @@ void do_cmd_exec(char *filepath) {
         if (strcmp(c_filepath, filepath) == 0) {
             // exec c_filedata
             char *ustack = simple_malloc(256);
-            asm volatile("msr spsr_el1, %0" ::"r"(0x3c0));       // set state to user mode, and enable interrupt
+            asm volatile("msr spsr_el1, %0;" ::"r"(0x3c0));      // set state to user mode, and enable interrupt
             asm volatile("msr elr_el1, %0;" ::"r"(c_filedata));  // set exception return addr to 'c_filedata'(any
                                                                  // addr may be ok)
             asm volatile("msr sp_el0, %0;" ::"r"(ustack + 256)); // set el0's sp to top of new stack
