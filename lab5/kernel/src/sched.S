@@ -1,6 +1,6 @@
 // arm32 pass args by x0 ~ x3, if more than 4 args, pass by stack
 .global switch_to
-switch_to: // called with 2 param, (prev, next) = (x0, x1)
+switch_to: // called with 2 param, (prev, next) = (x0, x1), return int
     stp x19, x20, [x0, 16 * 0]
     stp x21, x22, [x0, 16 * 1]
     stp x23, x24, [x0, 16 * 2]
@@ -18,11 +18,23 @@ switch_to: // called with 2 param, (prev, next) = (x0, x1)
     ldp fp, lr, [x1, 16 * 5]
     ldr x9, [x1, 16 * 6]
     mov sp,  x9
-    msr tpidr_el1, x1
+    msr tpidr_el1, x1 // tpidr_el1 stores starting address of thread's context
     ret
 
 // x0: return value
-.global get_current
+.global get_current  // called with no param, return int
 get_current:
     mrs x0, tpidr_el1
+    ret
+
+.global store_context
+store_context: // void store_context (unsigned long* addr_to_store);
+    stp x19, x20, [x0, 16 * 0]
+    stp x21, x22, [x0, 16 * 1]
+    stp x23, x24, [x0, 16 * 2]
+    stp x25, x26, [x0, 16 * 3]
+    stp x27, x28, [x0, 16 * 4]
+    stp fp, lr, [x0, 16 * 5]
+    mov x9, sp
+    str x9, [x0, 16 * 6]
     ret

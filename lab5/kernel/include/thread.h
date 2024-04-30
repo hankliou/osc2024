@@ -8,6 +8,7 @@
 typedef struct thread_context {
     // callee saved registers
     // https://developer.arm.com/documentation/102374/0101/Procedure-Call-Standard
+    // since on 64bits arch, regs are 64 bits = sizeof(unsigned long)
     unsigned long x19;
     unsigned long x20;
     unsigned long x21;
@@ -43,6 +44,7 @@ void schedule();                                  // switch to next job
 void idle();                                      // keep scheduling
 void thread_exit();                               // mark thread 'zombie'
 void kill_zombie();                               // remove zombie process
+void thread_exec(char *code, char codesize);      // exec task in new thread
 void foo();                                       // test function
 
 #endif /* _THREAD_H_ */

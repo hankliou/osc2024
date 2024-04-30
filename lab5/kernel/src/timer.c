@@ -69,8 +69,7 @@ void add_timer(void *callback, char *msg, unsigned long long timeout) {
     asm volatile("mrs %0, cntpct_el0" : "=r"(tick));
     asm volatile("mrs %0, cntfrq_el0" : "=r"(freq));
     node->interrupt_time = timeout * freq + tick;
-    node->msg =
-        simple_malloc(strlen(msg) + 1); // need to free when times up(in timer_handler)
+    node->msg = simple_malloc(strlen(msg) + 1); // need to free when times up(in timer_handler)
     strcpy(node->msg, msg);
 
     // insert node into list
@@ -96,10 +95,10 @@ void timer_print_msg(char *msg) {
 // set timer [expire_time] from now (abs)
 void set_timer_interrupt(unsigned long long expire_time) {
     asm volatile("mrs x1, cntfrq_el0\n\t");
-    asm volatile("mul x1, x1, %0\n\t" : "=r"(expire_time));
+    asm volatile("mul x1, x1, %0\n\t" ::"r"(expire_time));
     asm volatile("msr cntp_cval_el0, x1\n\t");
 }
 
 void set_timer_interrupt_by_tick(unsigned long long time) {
-    asm volatile("msr cntp_cval_el0, %0" : "=r"(time));
+    asm volatile("msr cntp_cval_el0, %0" ::"r"(time));
 }

@@ -4,12 +4,16 @@
 #include "mbox.h"
 #include "memory.h"
 #include "power.h"
+#include "syscall.h"
 #include "thread.h"
 #include "timer.h"
 #include "u_string.h"
 #include "uart1.h"
 
 extern char *dtb_ptr;
+
+extern thread *cur_thread;
+
 void *CPIO_DEFAULT_START; // root of ramfs
 void *CPIO_DEFAULT_END;   // end addressl of ramfs
 
@@ -28,6 +32,7 @@ struct CLI_CMDS cmd_list[CLI_MAX_CMD] = {
     {.command = "testAsyncUart", .help = "will echo your input by async UART"},
     {.command = "mem_test", .help = "lazy testing kmalloc and kfree"},
     {.command = "thread_test", .help = "test threads interleaving"},
+    {.command = "syscall_test", .help = "test syscall"},
 };
 
 void do_cmd_exec(char *filepath) {
@@ -49,8 +54,9 @@ void do_cmd_exec(char *filepath) {
         if (strcmp(c_filepath, filepath) == 0) {
             // exec c_filedata
             char *ustack = simple_malloc(256);
-            asm volatile("msr spsr_el1, %0;" ::"r"(0x3c0));      // set state to user mode, and enable interrupt
-            asm volatile("msr elr_el1, %0;" ::"r"(c_filedata));  // set exception return addr to 'c_filedata'(any
+            asm volatile("msr spsr_el1, %0;" ::"r"(0x3c0)); // set state to user mode, and enable interrupt
+            asm volatile("msr elr_el1, %0;"
+                         : "=r"(c_filedata));                    // set exception return addr to 'c_filedata'(any
                                                                  // addr may be ok)
             asm volatile("msr sp_el0, %0;" ::"r"(ustack + 256)); // set el0's sp to top of new stack
             asm volatile("eret;");                               // switch EL to 0
@@ -154,6 +160,8 @@ void cli_cmd_exec(char *buffer) {
         do_cmd_mem_test();
     } else if (strcmp(cmd, "thread_test") == 0) {
         do_cmd_thread_test();
+    } else if (strcmp(cmd, "syscall_test") == 0) {
+        do_cmd_syscall_test();
     } else {
         uart_sendline("%s : command not found\n", cmd);
     }
@@ -242,7 +250,7 @@ void do_cmd_info() {
     pt[6] = 0;
     pt[7] = MBOX_TAG_LAST_BYTE;
 
-    if (mbox_call(MBOX_TAGS_ARM_TO_VC, (unsigned int)((unsigned long)&pt))) {
+    if (k_mbox_call(MBOX_TAGS_ARM_TO_VC, (unsigned int)((unsigned long)&pt))) {
         uart_sendline("Hardware Revision\t: ");
         uart_2hex(pt[6]);
         uart_2hex(pt[5]);
@@ -258,7 +266,7 @@ void do_cmd_info() {
     pt[6] = 0;
     pt[7] = MBOX_TAG_LAST_BYTE;
 
-    if (mbox_call(MBOX_TAGS_ARM_TO_VC, (unsigned int)((unsigned long)&pt))) {
+    if (k_mbox_call(MBOX_TAGS_ARM_TO_VC, (unsigned int)((unsigned long)&pt))) {
         uart_sendline("ARM Memory Base Address\t: ");
         uart_2hex(pt[5]);
         uart_sendline("\r\n");
@@ -382,4 +390,64 @@ void do_cmd_thread_test() {
         uart_sendline("testing: %d\n", thread_create(foo)->pid);
     }
     idle();
+}
+
+void do_cmd_syscall_test() {
+    // TODO: switch to el0
+    thread *t = thread_create(fork_test);
+    schedule();
+    // while (cur_thread != t)
+    //     schedule();
+
+    // void (*ptr)() = schedule;
+    // asm volatile("msr elr_el1, %0" : "=r"(t->code));
+    // asm volatile("eret");
+    // asm volatile("msr tpidr_el1, %0" ::"r"(&t->context));  // Hold the "kernel(el1)" thread structure information
+    // asm volatile("msr elr_el1, %0" : "=r"(t->context.lr)); // When el0 -> el1, store return address for el1 -> el0
+    // asm volatile("msr spsr_el1, xzr");                     // Enable interrupt in EL0 -> Used for thread scheduler
+    // asm volatile("msr sp_el0, %0" : "=r"(t->context.sp));  // el0 stack pointer for el1 process
+    // asm volatile("mov sp, %0" ::"r"(
+    //     t->kernel_stack_ptr +
+    //     KSTACK_SIZE)); // sp is reference for the same el process. For example, el2 cannot use sp_el2, it has to use sp to find its own stack.
+    // asm volatile("eret");
+}
+
+void fork_test() {
+    // debug: check EL(exception level) by watch reg
+    unsigned long el;
+    asm volatile("mrs %0, CurrentEL" : "=r"(el));
+    uart_sendline("Current EL is: ");
+    uart_2hex((el >> 2) & 3);
+    uart_sendline("\n");
+
+    trap_frame *tpf = kmalloc(sizeof(trap_frame));
+
+    uart_sendline("\nFork Test, pid %d\n", getpid(tpf));
+    int cnt = 1;
+    int ret = 0;
+    if ((ret = fork(tpf)) == 0) { // child
+        long long cur_sp;
+        asm volatile("mov %0, sp" : "=r"(cur_sp));
+        uart_sendline("first child pid: %d, cnt: %d, ptr: %x, sp : %x\n", getpid(tpf), cnt, &cnt, cur_sp);
+        ++cnt;
+
+        if ((ret = fork(tpf)) != 0) {
+            asm volatile("mov %0, sp" : "=r"(cur_sp));
+            uart_sendline("first child pid: %d, cnt: %d, ptr: %x, sp : %x\n", getpid(tpf), cnt, &cnt, cur_sp);
+        } else {
+            while (cnt < 5) {
+                asm volatile("mov %0, sp" : "=r"(cur_sp));
+                uart_sendline("second child pid: %d, cnt: %d, ptr: %x, sp : %x\n", getpid(tpf), cnt, &cnt, cur_sp);
+                for (int i = 0; i < 1000000; i++)
+                    asm volatile("nop\n\t");
+                ++cnt;
+            }
+        }
+        exit(tpf, 0);
+    } else {
+        uart_sendline("parent here, pid %d, child %d\n", getpid(tpf), ret);
+        exit(tpf, 0);
+    }
+
+    kfree(tpf);
 }

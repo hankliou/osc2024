@@ -1,12 +1,14 @@
 #include "thread.h"
-#include "../include/memory.h"
+#include "exception.h"
+#include "memory.h"
+#include "u_string.h"
 #include "uart1.h"
 
-extern int switch_to();
-extern int get_current();
+extern unsigned long switch_to();
+extern unsigned long get_current();
 
-static int pid_cnt = 0;
-static thread *run_queue;
+int pid_cnt = 0;
+thread *run_queue;
 thread thread_list[MAXPID + 1];
 thread *cur_thread;
 
@@ -22,7 +24,7 @@ void init_thread() {
         thread_list[i].iszombie = 0;
         thread_list[i].pid = i;
     }
-    // asm volatile("msr tpidr_el1, %0" ::"r"(kmalloc(sizeof(thread)))); // Don't let thread structure NULL as we enable the functionality
+    // asm volatile("msr tpidr_el1, %0" :: "r"(kmalloc(sizeof(thread)))); // Don't let thread structure NULL as we enable the functionality
     cur_thread = thread_create(idle);
 
     unlock();
@@ -70,12 +72,13 @@ void schedule() {
     // context switch (defined in asm)
     // pass both thread's addr as base addr, to load/store the registers
     switch_to(get_current(), &cur_thread->context);
-
     unlock();
 }
 
 void idle() {
     while (1) {
+        // TODO: program will stuck in idle
+        // uart_sendline("idle...\n");
         kill_zombie();
         schedule();
     }
@@ -89,7 +92,7 @@ void thread_exit() {
 }
 
 void kill_zombie() {
-    // TODO:lock
+    lock();
     for (thread *cur = run_queue->next; cur != run_queue; cur = cur->next) {
         if (cur->iszombie) {
             // remove from list
@@ -104,7 +107,18 @@ void kill_zombie() {
         }
     }
 
-    // TODO:unlock
+    unlock();
+}
+
+void thread_exec(char *code, char codesize) {
+    thread *thrd = thread_create(code);
+    thrd->code = kmalloc(codesize);
+    thrd->codesize = codesize;
+    thrd->context.lr = (unsigned long)thrd->code;
+
+    memcpy(thrd->code, code, codesize);
+
+    cur_thread = thrd;
 }
 
 void foo() {

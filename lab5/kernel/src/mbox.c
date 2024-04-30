@@ -4,7 +4,7 @@
 /* Aligned to 16-byte boundary while we have 28-bits for VC */
 volatile unsigned int __attribute__((aligned(16))) pt[64];
 
-int mbox_call(mbox_channel_type channel, unsigned int value) {
+int k_mbox_call(mbox_channel_type channel, unsigned int value) {
     // add channel to lower 4 bit
     value &= ~(0xF);  // get front 28 bits
     value |= channel; // combine with channel

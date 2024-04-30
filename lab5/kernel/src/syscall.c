@@ -12,6 +12,9 @@ extern thread thread_list[MAXPID + 1];
 
 extern void *CPIO_DEFAULT_START;
 
+extern void store_context(unsigned long int);
+extern unsigned long get_current();
+
 /*
     When it comes to system calls, the user software expects the kernel to take care of it.
     The program uses the general-purpose registers to set the arguments and receive the return value, just like conventional function calls.
@@ -29,6 +32,7 @@ int getpid(trap_frame *tpf) {
     return cur_thread->pid;
 }
 
+// user have to allocate spaces to x0(buf) themself
 size_t uart_read(trap_frame *tpf, char buf[], size_t size) {
     int i = 0;
     while (i < size)
@@ -37,6 +41,7 @@ size_t uart_read(trap_frame *tpf, char buf[], size_t size) {
     return i;
 }
 
+// user have to allocate spaces to x0(buf) themself
 size_t uart_write(trap_frame *tpf, const char buf[], size_t size) {
     int i = 0;
     while (i < size)
@@ -47,6 +52,7 @@ size_t uart_write(trap_frame *tpf, const char buf[], size_t size) {
 
 // Note: In this lab, you won’t have to deal with argument passing, but you can still use it.
 int exec(trap_frame *tpf, const char *name, char *const argv[]) {
+    return 0;
 }
 
 // return child's id to parent, return 0 to child
@@ -61,7 +67,8 @@ int fork(trap_frame *tpf) {
     memcpy(child->private_stack_ptr, cur_thread->private_stack_ptr, USTACK_SIZE); // copy user stack (deep copy)
     memcpy(child->kernel_stack_ptr, cur_thread->kernel_stack_ptr, KSTACK_SIZE);   // copy kernel stack
 
-    // store parent's context ??
+    // before coping context, update parent's context first!!!
+    store_context(get_current());
 
     // child
     if (cur_thread->pid != parent_id) {
@@ -72,7 +79,7 @@ int fork(trap_frame *tpf) {
         return 0; // jump to link register
     }
 
-    // parent
+    // copy parent's context
     child->context = cur_thread->context;
     // fix stacks's offset
     // when create new thread, it will get a private/kernel stack space
@@ -85,7 +92,7 @@ int fork(trap_frame *tpf) {
     return child->pid; // return child's pid
 }
 
-void exit() {
+void exit(trap_frame *tpf, int status) {
     thread_exit();
 }
 
@@ -109,7 +116,7 @@ int mbox_call(trap_frame *tpf, unsigned char ch, unsigned int *mbox) {
     return 0;
 }
 
-void kill(int pid) {
+void kill(trap_frame *tpf, int pid) {
     if (pid < 0 || pid > MAXPID || !thread_list[pid].isused)
         return;
     lock();
@@ -128,7 +135,7 @@ unsigned int get_file_size(char *path) {
         int error = cpio_newc_parse_header(head, &filepath, &filesize, &filedata, &head);
         if (error) {
             uart_sendline("cpio parse error\n");
-            return;
+            return -1;
         }
         if (strcmp(filepath, path) == 0)
             return filesize;
@@ -140,7 +147,7 @@ unsigned int get_file_size(char *path) {
     return 0;
 }
 
-unsigned int get_file_start(char *path) {
+char *get_file_start(char *path) {
     char *filepath, *filedata;
     unsigned int filesize;
     struct cpio_newc_header *head = CPIO_DEFAULT_START;
@@ -150,7 +157,7 @@ unsigned int get_file_start(char *path) {
         int error = cpio_newc_parse_header(head, &filepath, &filesize, &filedata, &head);
         if (error) {
             uart_sendline("cpio parse error\n");
-            return;
+            break;
         }
         if (strcmp(filepath, path) == 0)
             return filedata;

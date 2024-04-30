@@ -47,12 +47,12 @@ size_t uart_read(trap_frame *tpf, char buf[], size_t size);
 size_t uart_write(trap_frame *tpf, const char buf[], size_t size);
 int exec(trap_frame *tpf, const char *name, char *const argv[]);
 int fork(trap_frame *tpf);
-void exit();
+void exit(trap_frame *tpf, int status);
 int mbox_call(trap_frame *tpf, unsigned char ch, unsigned int *mbox);
-void kill(int pid);
+void kill(trap_frame *tpf, int pid);
 
 // components
 unsigned int get_file_size(char *path);
-unsigned int get_file_start(char *path);
+char *get_file_start(char *path);
 
 #endif
