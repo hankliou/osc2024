@@ -3,6 +3,7 @@
 #include "bcm2837/rpi_uart1.h"
 #include "memory.h"
 #include "syscall.h"
+#include "thread.h"
 #include "timer.h"
 #include "uart1.h"
 
@@ -68,6 +69,7 @@ void el1h_irq_router() {
         timer_disable_interrupt();
         add_irq_task(timer_handler, TIMER_IRQ_PRIORITY);
         timer_enable_interrupt();
+        // schedule();
     }
 }
 

@@ -45,6 +45,7 @@ void idle();                                      // keep scheduling
 void thread_exit();                               // mark thread 'zombie'
 void kill_zombie();                               // remove zombie process
 void thread_exec(char *code, char codesize);      // exec task in new thread
+void schedule_timer();                            // basic 3, "Set the expired time as core timer frequency shift right 5 bits."
 void foo();                                       // test function
 
 #endif /* _THREAD_H_ */

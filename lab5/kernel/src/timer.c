@@ -26,6 +26,10 @@ void timer_init_interrupt() {
                  "mov x0, 2;"
                  "ldr x1, =0x40000040;" //  CORE_TIMER_IRQ_CTRL
                  "str w0, [x1]\n\t");   // Unmask timer interrupt
+    unsigned long tmp;
+    asm volatile("mrs %0, cntkctl_el1" : "=r"(tmp));
+    tmp |= 1;
+    asm volatile("msr cntkctl_el1, %0" : : "r"(tmp));
 }
 
 void timer_enable_interrupt() {

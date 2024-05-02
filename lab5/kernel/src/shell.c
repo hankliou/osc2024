@@ -394,17 +394,20 @@ void do_cmd_thread_test() {
 
 void do_cmd_syscall_test() {
     // TODO: switch to el0
+    checkEL();
     thread *t = thread_create(fork_test);
     schedule();
     // while (cur_thread != t)
     //     schedule();
 
-    // void (*ptr)() = schedule;
     // asm volatile("msr elr_el1, %0" : "=r"(t->code));
+    // asm volatile("msr spsr_el1, %0" ::"r"(0x0));
+    // asm volatile("msr sp_el0, %0" : "=r"(t->context.sp));
     // asm volatile("eret");
+
     // asm volatile("msr tpidr_el1, %0" ::"r"(&t->context));  // Hold the "kernel(el1)" thread structure information
     // asm volatile("msr elr_el1, %0" : "=r"(t->context.lr)); // When el0 -> el1, store return address for el1 -> el0
-    // asm volatile("msr spsr_el1, xzr");                     // Enable interrupt in EL0 -> Used for thread scheduler
+    // asm volatile("msr spsr_el1, %0" ::"r"(0x3c0));         // Enable interrupt in EL0 -> Used for thread scheduler
     // asm volatile("msr sp_el0, %0" : "=r"(t->context.sp));  // el0 stack pointer for el1 process
     // asm volatile("mov sp, %0" ::"r"(
     //     t->kernel_stack_ptr +
@@ -413,13 +416,7 @@ void do_cmd_syscall_test() {
 }
 
 void fork_test() {
-    // debug: check EL(exception level) by watch reg
-    unsigned long el;
-    asm volatile("mrs %0, CurrentEL" : "=r"(el));
-    uart_sendline("Current EL is: ");
-    uart_2hex((el >> 2) & 3);
-    uart_sendline("\n");
-
+    // checkEL();
     trap_frame *tpf = kmalloc(sizeof(trap_frame));
 
     uart_sendline("\nFork Test, pid %d\n", getpid(tpf));
@@ -429,15 +426,18 @@ void fork_test() {
         long long cur_sp;
         asm volatile("mov %0, sp" : "=r"(cur_sp));
         uart_sendline("first child pid: %d, cnt: %d, ptr: %x, sp : %x\n", getpid(tpf), cnt, &cnt, cur_sp);
+        checkEL();
         ++cnt;
 
         if ((ret = fork(tpf)) != 0) {
             asm volatile("mov %0, sp" : "=r"(cur_sp));
             uart_sendline("first child pid: %d, cnt: %d, ptr: %x, sp : %x\n", getpid(tpf), cnt, &cnt, cur_sp);
+            checkEL();
         } else {
             while (cnt < 5) {
                 asm volatile("mov %0, sp" : "=r"(cur_sp));
                 uart_sendline("second child pid: %d, cnt: %d, ptr: %x, sp : %x\n", getpid(tpf), cnt, &cnt, cur_sp);
+                checkEL();
                 for (int i = 0; i < 1000000; i++)
                     asm volatile("nop\n\t");
                 ++cnt;
@@ -446,8 +446,18 @@ void fork_test() {
         exit(tpf, 0);
     } else {
         uart_sendline("parent here, pid %d, child %d\n", getpid(tpf), ret);
+        checkEL();
         exit(tpf, 0);
     }
 
     kfree(tpf);
+}
+
+void checkEL() {
+    // debug: check EL(exception level) by watch reg
+    unsigned long el;
+    asm volatile("mrs %0, CurrentEL" : "=r"(el));
+    uart_sendline("Current EL is: ");
+    uart_2hex((el >> 2) & 3);
+    uart_sendline("\n");
 }

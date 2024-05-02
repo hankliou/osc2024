@@ -1,6 +1,7 @@
 #include "thread.h"
 #include "exception.h"
 #include "memory.h"
+#include "timer.h"
 #include "u_string.h"
 #include "uart1.h"
 
@@ -76,12 +77,14 @@ void schedule() {
 }
 
 void idle() {
-    while (1) {
-        // TODO: program will stuck in idle
-        // uart_sendline("idle...\n");
-        kill_zombie();
-        schedule();
-    }
+    // while (1) {
+    // TODO: program will stuck in idle
+    uart_sendline("idle...\n");
+    // for (int i = 0; i < 10000000; i++)
+    //     asm volatile("nop");
+    kill_zombie();
+    schedule();
+    // }
 }
 
 void thread_exit() {
@@ -119,6 +122,12 @@ void thread_exec(char *code, char codesize) {
     memcpy(thrd->code, code, codesize);
 
     cur_thread = thrd;
+}
+
+void schedule_timer() {
+    unsigned long long timeout;
+    asm volatile("mrs %0, cntfrq_el0;" : "=r"(timeout));
+    add_timer(schedule_timer, "re-schedule", timeout >> 5);
 }
 
 void foo() {

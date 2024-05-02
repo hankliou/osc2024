@@ -85,14 +85,14 @@ void allocator_init() {
     // dump_free_frame_list();
 
     // start up allocation
-    uart_sendline("Buddy system usable memory from 0x%x to 0x%x\n", ALLOCATION_BASE, ALLOCATION_END);
-    uart_sendline("Page size: %d Byte, total available frame: %d\n", PAGE_SIZE, MAX_PAGE);
-    uart_sendline("[Start up allocation]\n");
-    uart_sendline("\nSpin tables & DTB:");
+    // uart_sendline("Buddy system usable memory from 0x%x to 0x%x\n", ALLOCATION_BASE, ALLOCATION_END);
+    // uart_sendline("Page size: %d Byte, total available frame: %d\n", PAGE_SIZE, MAX_PAGE);
+    // uart_sendline("[Start up allocation]\n");
+    // uart_sendline("\nSpin tables & DTB:");
     dtb_get_reserved_memory(); // spin tables and dtb itself
-    uart_sendline("\n_start ~ _end:");
+    // uart_sendline("\n_start ~ _end:");
     memory_reserve((unsigned long long)&_start, (unsigned long long)&_end); // kernel image (stack, heap included)
-    uart_sendline("\nCPIO_DEFAULT_START ~ CPIO_DEFAULT_END:");
+    // uart_sendline("\nCPIO_DEFAULT_START ~ CPIO_DEFAULT_END:");
     memory_reserve((unsigned long long)CPIO_DEFAULT_START, (unsigned long long)CPIO_DEFAULT_END); // initramfs
     // dump_free_frame_list();
 }
@@ -333,10 +333,10 @@ void kfree(void *ptr) {
 // start, end: address (e.g. 0x1234 5678), a frame contains 0x8000 bits !!!
 void memory_reserve(unsigned long long start, unsigned long long end) {
     // turn start, end into frame idx
-    uart_sendline("\nReserve Memory from 0x%8x to 0x%8x", start, end);
+    // uart_sendline("\nReserve Memory from 0x%8x to 0x%8x", start, end);
     start = ((start - ALLOCATION_BASE) >> (PAGE_LEVEL + 3));
     end = (end % (1 << (PAGE_LEVEL + 3))) == 0 ? ((end - ALLOCATION_BASE) >> (PAGE_LEVEL + 3)) : ((end - ALLOCATION_BASE) >> (PAGE_LEVEL + 3)) + 1;
-    uart_sendline(" (frame %d ~ %d)\n", start, end);
+    // uart_sendline(" (frame %d ~ %d)\n", start, end);
 
     for (int expo = MAX_PAGE_EXP; expo >= 0; expo--) {
 
@@ -345,8 +345,8 @@ void memory_reserve(unsigned long long start, unsigned long long end) {
             int frame_start = it->idx, frame_end = it->idx + (1 << it->val); // get the range of frames
             // reserve
             if (start <= frame_start && frame_end <= end) {
-                uart_sendline("[Reserve] 0x%8x ~ 0x%8x\n", ((it->idx << (PAGE_LEVEL + 3)) + ALLOCATION_BASE),
-                              (((it->idx + (1 << it->val)) << (PAGE_LEVEL + 3)) + ALLOCATION_BASE));
+                // uart_sendline("[Reserve] 0x%8x ~ 0x%8x\n", ((it->idx << (PAGE_LEVEL + 3)) + ALLOCATION_BASE),
+                //               (((it->idx + (1 << it->val)) << (PAGE_LEVEL + 3)) + ALLOCATION_BASE));
                 it->used = FRAME_OCCUPIED_FLAG;
                 it->prev->next = it->next;
                 it->next->prev = it->prev;
