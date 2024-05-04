@@ -57,7 +57,6 @@ int exec(trap_frame *tpf, const char *name, char *const argv[]) {
 
 // return child's id to parent, return 0 to child
 int fork(trap_frame *tpf) {
-
     lock();
 
     thread *child = thread_create(cur_thread->code);                              // create new thread

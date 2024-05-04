@@ -54,10 +54,8 @@ void do_cmd_exec(char *filepath) {
         if (strcmp(c_filepath, filepath) == 0) {
             // exec c_filedata
             char *ustack = simple_malloc(256);
-            asm volatile("msr spsr_el1, %0;" ::"r"(0x3c0)); // set state to user mode, and enable interrupt
-            asm volatile("msr elr_el1, %0;"
-                         : "=r"(c_filedata));                    // set exception return addr to 'c_filedata'(any
-                                                                 // addr may be ok)
+            asm volatile("msr spsr_el1, %0;" ::"r"(0x3c0));      // set state to user mode, and enable interrupt
+            asm volatile("msr elr_el1, %0;" ::"r"(c_filedata));  // set exception return addr to 'c_filedata'
             asm volatile("msr sp_el0, %0;" ::"r"(ustack + 256)); // set el0's sp to top of new stack
             asm volatile("eret;");                               // switch EL to 0
 
@@ -395,14 +393,14 @@ void do_cmd_thread_test() {
 void do_cmd_syscall_test() {
     // TODO: switch to el0
     thread *t = thread_create(fork_test);
-    // schedule();
+    schedule();
     // while (cur_thread != t)
     //     schedule();
 
-    asm volatile("msr elr_el1, %0" ::"r"(schedule));
+    // asm volatile("msr elr_el1, %0" ::"r"(schedule));
     // asm volatile("msr spsr_el1, %0" ::"r"(0x3c0));
-    asm volatile("msr sp_el0, %0" ::"r"(t->kernel_stack_ptr + KSTACK_SIZE));
-    asm volatile("eret");
+    // asm volatile("msr sp_el0, %0" ::"r"(t->kernel_stack_ptr + KSTACK_SIZE));
+    // asm volatile("eret");
 
     // chuckwu2000
     // asm volatile("msr elr_el1, %0" ::"r"(t->context.lr));
@@ -426,25 +424,27 @@ void do_cmd_syscall_test() {
 void fork_test() {
     trap_frame *tpf = kmalloc(sizeof(trap_frame));
     uart_sendline("\nFork Test, pid %d\n", getpid(tpf));
-    checkEL();
     int cnt = 1;
     int ret = 0;
-    if ((ret = fork(tpf)) == 0) { // child
+
+    asm volatile("mov x8, %0" ::"r"(4));
+    asm volatile("svc 0");
+    asm volatile("mov %0, x0" ::"r"(ret));
+    uart_sendline("ret : %d\n", ret);
+    // while (1) {};
+    if (ret == 0) { // child
         long long cur_sp;
         asm volatile("mov %0, sp" : "=r"(cur_sp));
         uart_sendline("first child pid: %d, cnt: %d, ptr: %x, sp : %x\n", getpid(tpf), cnt, &cnt, cur_sp);
-        checkEL();
         ++cnt;
 
         if ((ret = fork(tpf)) != 0) {
             asm volatile("mov %0, sp" : "=r"(cur_sp));
             uart_sendline("first child pid: %d, cnt: %d, ptr: %x, sp : %x\n", getpid(tpf), cnt, &cnt, cur_sp);
-            checkEL();
         } else {
             while (cnt < 5) {
                 asm volatile("mov %0, sp" : "=r"(cur_sp));
                 uart_sendline("second child pid: %d, cnt: %d, ptr: %x, sp : %x\n", getpid(tpf), cnt, &cnt, cur_sp);
-                checkEL();
                 for (int i = 0; i < 1000000; i++)
                     asm volatile("nop\n\t");
                 ++cnt;
@@ -453,7 +453,6 @@ void fork_test() {
         exit(tpf, 0);
     } else {
         uart_sendline("parent here, pid %d, child %d\n", getpid(tpf), ret);
-        checkEL();
         exit(tpf, 0);
     }
 

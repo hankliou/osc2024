@@ -64,17 +64,28 @@ thread *thread_create(void *funcion_start_point) {
     return the_thread;
 }
 
+void el1toel0(thread *t) {
+    asm volatile("msr elr_el1, lr");
+    asm volatile("msr spsr_el1, %0" ::"r"(0x3c0));
+    asm volatile("msr sp_el0, %0" ::"r"(t->kernel_stack_ptr + KSTACK_SIZE));
+    asm volatile("eret");
+}
+
 void schedule() {
-    // lock();
+    lock();
+    // while (1) {};
     // find a job to schedule, otherwise spinning til found
+    thread *tmp = cur_thread;
     do {
         cur_thread = cur_thread->next;
     } while (cur_thread == run_queue);
 
+    el1toel0(tmp);
+
     // context switch (defined in asm)
     // pass both thread's addr as base addr, to load/store the registers
     switch_to(get_current(), &cur_thread->context);
-    // unlock();
+    unlock();
 }
 
 void idle() {
