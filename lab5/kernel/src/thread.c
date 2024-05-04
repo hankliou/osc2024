@@ -25,8 +25,9 @@ void init_thread() {
         thread_list[i].iszombie = 0;
         thread_list[i].pid = i;
     }
-    // asm volatile("msr tpidr_el1, %0" :: "r"(kmalloc(sizeof(thread)))); // Don't let thread structure NULL as we enable the functionality
+    // BUG: Don't let thread structure NULL as we enable the functionality
     cur_thread = thread_create(idle);
+    asm volatile("msr tpidr_el1, %0" ::"r"(&cur_thread->context));
 
     unlock();
 }
@@ -64,7 +65,7 @@ thread *thread_create(void *funcion_start_point) {
 }
 
 void schedule() {
-    lock();
+    // lock();
     // find a job to schedule, otherwise spinning til found
     do {
         cur_thread = cur_thread->next;
@@ -73,18 +74,18 @@ void schedule() {
     // context switch (defined in asm)
     // pass both thread's addr as base addr, to load/store the registers
     switch_to(get_current(), &cur_thread->context);
-    unlock();
+    // unlock();
 }
 
 void idle() {
-    // while (1) {
-    // TODO: program will stuck in idle
-    uart_sendline("idle...\n");
-    // for (int i = 0; i < 10000000; i++)
-    //     asm volatile("nop");
-    kill_zombie();
-    schedule();
-    // }
+    while (1) {
+        // TODO: program will stuck in idle
+        // uart_sendline("idle...\n");
+        // for (int i = 0; i < 10000000; i++)
+        //     asm volatile("nop");
+        kill_zombie();
+        schedule();
+    }
 }
 
 void thread_exit() {

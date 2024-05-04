@@ -18,13 +18,13 @@ switch_to: // called with 2 param, (prev, next) = (x0, x1), return int
     ldp fp, lr, [x1, 16 * 5]
     ldr x9, [x1, 16 * 6]
     mov sp,  x9
-    msr tpidr_el1, x1 // tpidr_el1 stores starting address of thread's context
+    msr tpidr_el0, x1 // tpidr_el1 stores starting address of thread's context
     ret
 
 // x0: return value
 .global get_current  // called with no param, return int
 get_current:
-    mrs x0, tpidr_el1
+    mrs x0, tpidr_el0
     ret
 
 .global store_context

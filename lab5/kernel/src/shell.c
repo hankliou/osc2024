@@ -160,7 +160,7 @@ void cli_cmd_exec(char *buffer) {
         do_cmd_mem_test();
     } else if (strcmp(cmd, "thread_test") == 0) {
         do_cmd_thread_test();
-    } else if (strcmp(cmd, "syscall_test") == 0) {
+    } else if (strcmp(cmd, "s") == 0) {
         do_cmd_syscall_test();
     } else {
         uart_sendline("%s : command not found\n", cmd);
@@ -394,17 +394,25 @@ void do_cmd_thread_test() {
 
 void do_cmd_syscall_test() {
     // TODO: switch to el0
-    checkEL();
     thread *t = thread_create(fork_test);
-    schedule();
+    // schedule();
     // while (cur_thread != t)
     //     schedule();
 
-    // asm volatile("msr elr_el1, %0" : "=r"(t->code));
-    // asm volatile("msr spsr_el1, %0" ::"r"(0x0));
-    // asm volatile("msr sp_el0, %0" : "=r"(t->context.sp));
-    // asm volatile("eret");
+    asm volatile("msr elr_el1, %0" ::"r"(schedule));
+    // asm volatile("msr spsr_el1, %0" ::"r"(0x3c0));
+    asm volatile("msr sp_el0, %0" ::"r"(t->kernel_stack_ptr + KSTACK_SIZE));
+    asm volatile("eret");
 
+    // chuckwu2000
+    // asm volatile("msr elr_el1, %0" ::"r"(t->context.lr));
+    // asm volatile("msr spsr_el1, %0" ::"r"(0x0));
+    // asm volatile("msr sp_el0, %0" ::"r"(t->context.sp));
+    // asm volatile("eret");
+    // thd->reg.x19 = video_prog();
+    // thd->reg.x20 = thd->user_stack; // for user_stack
+
+    // crtao
     // asm volatile("msr tpidr_el1, %0" ::"r"(&t->context));  // Hold the "kernel(el1)" thread structure information
     // asm volatile("msr elr_el1, %0" : "=r"(t->context.lr)); // When el0 -> el1, store return address for el1 -> el0
     // asm volatile("msr spsr_el1, %0" ::"r"(0x3c0));         // Enable interrupt in EL0 -> Used for thread scheduler
@@ -416,10 +424,9 @@ void do_cmd_syscall_test() {
 }
 
 void fork_test() {
-    // checkEL();
     trap_frame *tpf = kmalloc(sizeof(trap_frame));
-
     uart_sendline("\nFork Test, pid %d\n", getpid(tpf));
+    checkEL();
     int cnt = 1;
     int ret = 0;
     if ((ret = fork(tpf)) == 0) { // child

@@ -98,6 +98,8 @@ el1t_sync_invalid:
     // load_state
     // eret
 el1t_irq_invalid:
+    WFE 
+    b el1t_irq_invalid
     // save_state
     // mov x0,1
     // bl invalid_exception_router

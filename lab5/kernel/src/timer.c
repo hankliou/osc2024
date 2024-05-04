@@ -19,13 +19,14 @@ void timer_list_insert_front(timer_node *node, timer_node *it) {
 }
 
 void timer_init_interrupt() {
-    asm volatile("mov x0, 1;"
-                 "msr cntp_ctl_el0, x0;" // Enable
-                 "mrs x0, cntfrq_el0;"
-                 "msr cntp_tval_el0, x0;" // Set expired time
-                 "mov x0, 2;"
-                 "ldr x1, =0x40000040;" //  CORE_TIMER_IRQ_CTRL
-                 "str w0, [x1]\n\t");   // Unmask timer interrupt
+    asm volatile("mov x0, 1");
+    asm volatile("msr cntp_ctl_el0, x0");  // Enable
+    asm volatile("mrs x0, cntfrq_el0");    // get the timer frequency
+    asm volatile("asr x0, x0, 5");         // lab5: shift 5 bits right(asr: Arithmetic Shift Right)
+    asm volatile("msr cntp_tval_el0, x0"); // Set expired time
+    asm volatile("mov x0, 2");             // w0 = lower half of x0
+    asm volatile("ldr x1, =0x40000040");   // CORE_TIMER_IRQ_CTRL
+    asm volatile("str w0, [x1]");          // Unmask timer interrupt
     unsigned long tmp;
     asm volatile("mrs %0, cntkctl_el1" : "=r"(tmp));
     tmp |= 1;
