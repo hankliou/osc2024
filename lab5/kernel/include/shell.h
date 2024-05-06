@@ -32,6 +32,5 @@ void do_cmd_thread_test();
 void do_cmd_syscall_test();
 
 void fork_test();
-void checkEL();
 
 #endif /* _SHELL_H_ */

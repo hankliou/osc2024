@@ -38,3 +38,7 @@ store_context: // void store_context (unsigned long* addr_to_store);
     mov x9, sp
     str x9, [x0, 16 * 6]
     ret
+
+
+hang:
+    b hang

@@ -12,7 +12,7 @@ char input_buffer[CMD_MAX_LEN];
 
 void main(char *arg) {
     // debug: check EL(exception level) by watch reg
-    checkEL();
+    getCurrentEL();
 
     dtb_ptr = arg;
     traverse_device_tree(dtb_ptr, dtb_callback_initramfs);
@@ -27,16 +27,6 @@ void main(char *arg) {
 
     allocator_init();
     init_thread();
-
-    // debug: trying switch to el0
-    // checkEL();
-    // lock();
-    // asm volatile("mov x1, %0" ::"r"(0x345)); // EL1h (SPSel = 1) with interrupt disabled
-    // void (*ptr)() = fork_test;
-    // asm volatile("msr elr_el1, %0" : "=r"(ptr));
-    // asm volatile("msr spsr_el1, %0" ::"r"(0x0));
-    // // asm volatile("msr sp_el0, %0" : "=r"(t->context.sp));
-    // asm volatile("eret");
 
     while (1) {
         cli_cmd_clear(input_buffer, CMD_MAX_LEN);

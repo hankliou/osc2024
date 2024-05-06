@@ -94,27 +94,25 @@ exception_vector_table:
 el1t_sync_invalid:
     // save_state
     // mov x0,0
-    // bl invalid_exception_router
+    bl invalid_exception_router
     // load_state
     // eret
 el1t_irq_invalid:
-    WFE 
-    b el1t_irq_invalid
-    // save_state
-    // mov x0,1
-    // bl invalid_exception_router
-    // load_state
-    // eret
+    save_state
+    mov x0,1
+    bl invalid_exception_router
+    load_state
+    eret
 el1t_fiq_invalid:
     // save_state
     // mov x0,2
-    // bl invalid_exception_router
+    bl invalid_exception_router
     // load_state
     // eret
 el1t_error_invalid:
     // save_state
     // mov x0,3
-    // bl invalid_exception_router
+    bl invalid_exception_router
     // load_state
     // eret
 
@@ -122,7 +120,7 @@ el1t_error_invalid:
 el1h_sync:
     // save_state
     // mov x0,4
-    // bl invalid_exception_router
+    bl invalid_exception_router
     // load_state
     // eret
 el1h_irq:
@@ -134,13 +132,13 @@ el1h_irq:
 el1h_fiq_invalid:
     // save_state
     // mov x0,6
-    // bl invalid_exception_router
+    bl invalid_exception_router
     // load_state
     // eret
 el1h_error_invalid:
     // save_state
     // mov x0,7
-    // bl invalid_exception_router
+    bl invalid_exception_router
     // load_state
     // eret
 
@@ -154,18 +152,19 @@ el0_irq_64:
     // save_state
     // mov x0, 9
     // bl el0_irq_64_router
+    bl invalid_exception_router
     // load_state
     // eret
 el0_fiq_invalid_64:
     // save_state
     // mov x0,10
-    // bl invalid_exception_router
+    bl invalid_exception_router
     // load_state
     // eret
 el0_error_invalid_64:
     // save_state
     // mov x0,11
-    // bl invalid_exception_router
+    bl invalid_exception_router
     // load_state
     // eret
 
@@ -173,24 +172,24 @@ el0_error_invalid_64:
 el0_sync_invalid_32:
     // save_state
     // mov x0,12
-    // bl invalid_exception_router
+    bl invalid_exception_router
     // load_state
     // eret
 el0_irq_invalid_32:
     // save_state
     // mov x0,13
-    // bl invalid_exception_router
+    bl invalid_exception_router
     // load_state
     // eret
 el0_fiq_invalid_32:
     // save_state
     // mov x0,14
-    // bl invalid_exception_router
+    bl invalid_exception_router
     // load_state
     // eret
 el0_error_invalid_32:
     // save_state
     // mov x0,15
-    // bl invalid_exception_router
+    bl invalid_exception_router
     // load_state
     // eret

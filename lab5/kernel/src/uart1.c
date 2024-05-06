@@ -10,6 +10,7 @@ unsigned int uart_tx_read = 0;
 unsigned int uart_tx_write = 0;
 unsigned int uart_rx_read = 0;
 unsigned int uart_rx_write = 0;
+int uart_recv_echo_flag = 0;
 
 void uart_init() {
     register unsigned int r;
@@ -63,9 +64,11 @@ char uart_recv() {
     // wait until LSR(fifo receiver) receive data
     while (!(*AUX_MU_LSR_REG & 0x01)) {};
     r = (char)(*AUX_MU_IO_REG); // save data in 'r'
-    uart_send(r);
-    if (r == '\r') {
-        uart_send('\n');
+    if (uart_recv_echo_flag) {
+        uart_send(r);
+        if (r == '\r') {
+            uart_send('\n');
+        }
     }
     return r == '\r' ? '\n' : r;
 }

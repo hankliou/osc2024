@@ -1,6 +1,7 @@
 #include "shell.h"
 #include "cpio.h"
 #include "dtb.h"
+#include "exception.h"
 #include "mbox.h"
 #include "memory.h"
 #include "power.h"
@@ -11,7 +12,7 @@
 #include "uart1.h"
 
 extern char *dtb_ptr;
-
+extern int uart_recv_echo_flag;
 extern thread *cur_thread;
 
 void *CPIO_DEFAULT_START; // root of ramfs
@@ -392,78 +393,101 @@ void do_cmd_thread_test() {
 
 void do_cmd_syscall_test() {
     // TODO: switch to el0
-    thread *t = thread_create(fork_test);
+    thread_create(fork_test);
     schedule();
-    // while (cur_thread != t)
-    //     schedule();
-
-    // asm volatile("msr elr_el1, %0" ::"r"(schedule));
-    // asm volatile("msr spsr_el1, %0" ::"r"(0x3c0));
-    // asm volatile("msr sp_el0, %0" ::"r"(t->kernel_stack_ptr + KSTACK_SIZE));
-    // asm volatile("eret");
-
-    // chuckwu2000
-    // asm volatile("msr elr_el1, %0" ::"r"(t->context.lr));
-    // asm volatile("msr spsr_el1, %0" ::"r"(0x0));
-    // asm volatile("msr sp_el0, %0" ::"r"(t->context.sp));
-    // asm volatile("eret");
-    // thd->reg.x19 = video_prog();
-    // thd->reg.x20 = thd->user_stack; // for user_stack
-
-    // crtao
-    // asm volatile("msr tpidr_el1, %0" ::"r"(&t->context));  // Hold the "kernel(el1)" thread structure information
-    // asm volatile("msr elr_el1, %0" : "=r"(t->context.lr)); // When el0 -> el1, store return address for el1 -> el0
-    // asm volatile("msr spsr_el1, %0" ::"r"(0x3c0));         // Enable interrupt in EL0 -> Used for thread scheduler
-    // asm volatile("msr sp_el0, %0" : "=r"(t->context.sp));  // el0 stack pointer for el1 process
-    // asm volatile("mov sp, %0" ::"r"(
-    //     t->kernel_stack_ptr +
-    //     KSTACK_SIZE)); // sp is reference for the same el process. For example, el2 cannot use sp_el2, it has to use sp to find its own stack.
-    // asm volatile("eret");
 }
 
-void fork_test() {
-    trap_frame *tpf = kmalloc(sizeof(trap_frame));
-    uart_sendline("\nFork Test, pid %d\n", getpid(tpf));
-    int cnt = 1;
+int test_fork() {
     int ret = 0;
-
-    asm volatile("mov x8, %0" ::"r"(4));
+    asm volatile("mov x8, 4");
     asm volatile("svc 0");
-    asm volatile("mov %0, x0" ::"r"(ret));
-    uart_sendline("ret : %d\n", ret);
-    // while (1) {};
-    if (ret == 0) { // child
+    asm volatile("mov %0, x0" : "=r"(ret));
+
+    uart_sendline("fork: %d\n", ret);
+    int lr;
+    asm volatile("mov %0, lr" : "=r"(lr));
+    uart_sendline("lr 2...: %d\n", lr);
+    return ret;
+}
+
+int test_getpid() {
+    int ret = 0;
+    asm volatile("mov x8, 0");
+    asm volatile("svc 0");
+    asm volatile("mov %0, x0" : "=r"(ret));
+    return ret;
+}
+
+void test_exit() {
+    asm volatile("mov x8, 5");
+    asm volatile("svc 0");
+}
+
+// run in user space
+void fork_test() {
+    // switch to user space
+    from_el1_to_el0(cur_thread);
+
+    uart_sendline("\nFork Test, pid %d\n", test_getpid());
+    int cnt = 1;
+    int ret;
+    if ((ret = test_fork()) == 0) { // child
+        uart_sendline("children here????\n");
+        // while (1) {};
         long long cur_sp;
         asm volatile("mov %0, sp" : "=r"(cur_sp));
-        uart_sendline("first child pid: %d, cnt: %d, ptr: %x, sp : %x\n", getpid(tpf), cnt, &cnt, cur_sp);
+        uart_sendline("first child pid: %d, cnt: %d, ptr: %x, sp : %x\n", test_getpid(), cnt, &cnt, cur_sp);
         ++cnt;
 
-        if ((ret = fork(tpf)) != 0) {
+        if ((ret = test_fork()) != 0) {
             asm volatile("mov %0, sp" : "=r"(cur_sp));
-            uart_sendline("first child pid: %d, cnt: %d, ptr: %x, sp : %x\n", getpid(tpf), cnt, &cnt, cur_sp);
+            uart_sendline("first child pid: %d, cnt: %d, ptr: %x, sp : %x\n", test_getpid(), cnt, &cnt, cur_sp);
         } else {
             while (cnt < 5) {
                 asm volatile("mov %0, sp" : "=r"(cur_sp));
-                uart_sendline("second child pid: %d, cnt: %d, ptr: %x, sp : %x\n", getpid(tpf), cnt, &cnt, cur_sp);
+                uart_sendline("second child pid: %d, cnt: %d, ptr: %x, sp : %x\n", test_getpid(), cnt, &cnt, cur_sp);
                 for (int i = 0; i < 1000000; i++)
                     asm volatile("nop\n\t");
                 ++cnt;
             }
         }
-        exit(tpf, 0);
+        test_exit();
     } else {
-        uart_sendline("parent here, pid %d, child %d\n", getpid(tpf), ret);
-        exit(tpf, 0);
+        uart_sendline("parent here, pid %d, child %d\n", test_getpid(), ret);
+        test_exit();
     }
-
-    kfree(tpf);
+    uart_sendline("ending...\n");
 }
 
-void checkEL() {
-    // debug: check EL(exception level) by watch reg
-    unsigned long el;
-    asm volatile("mrs %0, CurrentEL" : "=r"(el));
-    uart_sendline("Current EL is: ");
-    uart_2hex((el >> 2) & 3);
-    uart_sendline("\n");
-}
+// run in kernel space
+// void fork_test() {
+//     trap_frame *tpf = kmalloc(sizeof(trap_frame));
+//     uart_sendline("\nFork Test, pid %d\n", getpid(tpf));
+//     getCurrentEL();
+//     int cnt = 1;
+//     int ret;
+//     if ((ret = fork(tpf)) == 0) { // child
+//         long long cur_sp;
+//         asm volatile("mov %0, sp" : "=r"(cur_sp));
+//         uart_sendline("first child pid: %d, cnt: %d, ptr: %x, sp : %x\n", getpid(tpf), cnt, &cnt, cur_sp);
+//         ++cnt;
+
+//         if ((ret = fork(tpf)) != 0) {
+//             asm volatile("mov %0, sp" : "=r"(cur_sp));
+//             uart_sendline("first child pid: %d, cnt: %d, ptr: %x, sp : %x\n", getpid(tpf), cnt, &cnt, cur_sp);
+//         } else {
+//             while (cnt < 5) {
+//                 asm volatile("mov %0, sp" : "=r"(cur_sp));
+//                 uart_sendline("second child pid: %d, cnt: %d, ptr: %x, sp : %x\n", getpid(tpf), cnt, &cnt, cur_sp);
+//                 for (int i = 0; i < 1000000; i++)
+//                     asm volatile("nop\n\t");
+//                 ++cnt;
+//             }
+//         }
+//         exit(tpf, 1);
+//     } else {
+//         uart_sendline("parent here, pid %d, child %d\n", getpid(tpf), ret);
+//         exit(tpf, 1);
+//     }
+//     uart_sendline("ending...\n");
+// }

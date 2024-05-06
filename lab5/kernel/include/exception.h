@@ -47,5 +47,6 @@ void invalid_exception_router(); // exception_handler.S
 
 void lock();
 void unlock();
+int getCurrentEL();
 
 #endif

@@ -64,23 +64,22 @@ thread *thread_create(void *funcion_start_point) {
     return the_thread;
 }
 
-void el1toel0(thread *t) {
+void from_el1_to_el0(thread *t) {
     asm volatile("msr elr_el1, lr");
     asm volatile("msr spsr_el1, %0" ::"r"(0x3c0));
     asm volatile("msr sp_el0, %0" ::"r"(t->kernel_stack_ptr + KSTACK_SIZE));
     asm volatile("eret");
 }
 
+// find a job to schedule, otherwise spinning til found
 void schedule() {
+    // uart_sendline("scheduling...\n");
     lock();
-    // while (1) {};
-    // find a job to schedule, otherwise spinning til found
-    thread *tmp = cur_thread;
+    // let program keep execute after 'eret'
+    // thread *tmp = cur_thread; // tmp is current process, cur_thread will be next process
     do {
         cur_thread = cur_thread->next;
     } while (cur_thread == run_queue);
-
-    el1toel0(tmp);
 
     // context switch (defined in asm)
     // pass both thread's addr as base addr, to load/store the registers
@@ -89,25 +88,24 @@ void schedule() {
 }
 
 void idle() {
-    while (1) {
-        // TODO: program will stuck in idle
-        // uart_sendline("idle...\n");
-        // for (int i = 0; i < 10000000; i++)
-        //     asm volatile("nop");
-        kill_zombie();
-        schedule();
-    }
+    // TODO: program will stuck in idle
+    // uart_sendline("idle...\n");
+    // for (int i = 0; i < 10000000; i++)
+    //     asm volatile("nop");
+    kill_zombie();
+    schedule();
 }
 
 void thread_exit() {
     lock();
     cur_thread->iszombie = 1;
+    uart_sendline("exiting\n");
     unlock();
     schedule();
 }
 
 void kill_zombie() {
-    lock();
+    // lock();
     for (thread *cur = run_queue->next; cur != run_queue; cur = cur->next) {
         if (cur->iszombie) {
             // remove from list
@@ -121,19 +119,20 @@ void kill_zombie() {
             cur->iszombie = 0;
         }
     }
-
-    unlock();
+    // unlock();
 }
 
+// for video player
 void thread_exec(char *code, char codesize) {
-    thread *thrd = thread_create(code);
-    thrd->code = kmalloc(codesize);
-    thrd->codesize = codesize;
-    thrd->context.lr = (unsigned long)thrd->code;
+    // TODO
+    // thread *t = thread_create(code);
+    // t->code = kmalloc(codesize);
+    // t->codesize = codesize;
+    // t->context.lr = (unsigned long)t->code;
 
-    memcpy(thrd->code, code, codesize);
+    // memcpy(t->code, code, codesize);
 
-    cur_thread = thrd;
+    // cur_thread = t;
 }
 
 void schedule_timer() {

@@ -86,6 +86,7 @@ void el1h_irq_router() {
 
 void invalid_exception_router() {
     uart_sendline("invalid exception !\n");
+    while (1) {};
 }
 
 /* implement preemption */
@@ -158,4 +159,14 @@ void add_irq_task(void *callback, unsigned priority) {
         // execute event with interrupt enabled
         ((void (*)())task)();
     }
+}
+
+int getCurrentEL() {
+    // debug: check EL(exception level) by watch reg
+    unsigned long el;
+    asm volatile("mrs %0, CurrentEL" : "=r"(el));
+    uart_sendline("Current EL is: ");
+    uart_2hex((el >> 2) & 3);
+    uart_sendline("\n");
+    return ((el >> 2) & 3);
 }
