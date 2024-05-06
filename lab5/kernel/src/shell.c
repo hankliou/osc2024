@@ -425,7 +425,7 @@ void fork_test() {
 
     uart_sendline("\nFork Test, pid %d\n", test_getpid());
     int cnt = 1;
-    int ret;
+    int ret = 0;
     if ((ret = test_fork()) == 0) { // child
         long long cur_sp;
         asm volatile("mov %0, sp" : "=r"(cur_sp));
@@ -449,7 +449,6 @@ void fork_test() {
         uart_sendline("parent here, pid %d, child %d\n", test_getpid(), ret);
         test_exit();
     }
-    uart_sendline("ending...\n");
 }
 
 // run in kernel space

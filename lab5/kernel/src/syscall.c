@@ -60,12 +60,12 @@ int exec(trap_frame *tpf, const char *name, char *const argv[]) {
 int fork(trap_frame *tpf) {
     lock();
 
-    thread *child = thread_create(cur_thread->code);                              // create new thread
-    thread *parent = cur_thread;                                                  // backup parent thread
-    int parent_id = cur_thread->pid;                                              // record original pid
-    child->codesize = cur_thread->codesize;                                       // assign size
-    memcpy(child->private_stack_ptr, cur_thread->private_stack_ptr, USTACK_SIZE); // copy user stack (deep copy)
-    memcpy(child->kernel_stack_ptr, cur_thread->kernel_stack_ptr, KSTACK_SIZE);   // copy kernel stack
+    thread *child = thread_create(cur_thread->code);                            // create new thread
+    thread *parent = cur_thread;                                                // backup parent thread
+    int parent_id = cur_thread->pid;                                            // record original pid
+    child->codesize = cur_thread->codesize;                                     // assign size
+    memcpy(child->user_stack_ptr, cur_thread->user_stack_ptr, USTACK_SIZE);     // copy user stack (deep copy)
+    memcpy(child->kernel_stack_ptr, cur_thread->kernel_stack_ptr, KSTACK_SIZE); // copy kernel stack
 
     // before coping context, update parent's context first!!!
     store_context(get_current());

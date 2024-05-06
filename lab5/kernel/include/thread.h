@@ -28,14 +28,14 @@ typedef struct thread_context {
 typedef struct thread {
     struct thread *next;
     struct thread *prev;
-    char *code;              // something static like .text .data blablabla
-    unsigned int codesize;   // size of static data (code)
-    int iszombie;            // zombie flag
-    int pid;                 // process id
-    int isused;              // flag, check if thread is in used
-    char *private_stack_ptr; // stack segment
-    char *kernel_stack_ptr;  // store register when enter kernel mode
-    thread_context context;  // context(registers) need to store
+    char *code;             // something static like .text .data blablabla
+    unsigned int codesize;  // size of static data (code)
+    int iszombie;           // zombie flag
+    int pid;                // process id
+    int isused;             // flag, check if thread is in used
+    char *user_stack_ptr;   // stack segment
+    char *kernel_stack_ptr; // store register when enter kernel mode
+    thread_context context; // context(registers) need to store
 } thread;
 
 void init_thread();

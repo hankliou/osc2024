@@ -47,12 +47,11 @@ thread *thread_create(void *funcion_start_point) {
     // init property of 'the_thread'
     the_thread->iszombie = 0;
     the_thread->isused = 1;
-    the_thread->private_stack_ptr = kmalloc(USTACK_SIZE);
+    the_thread->user_stack_ptr = kmalloc(USTACK_SIZE);
     the_thread->kernel_stack_ptr = kmalloc(KSTACK_SIZE);
-    the_thread->context.lr = (unsigned long long)funcion_start_point;
-    the_thread->code = funcion_start_point;
+    the_thread->context.lr = (unsigned long)funcion_start_point;
     // sp init to the top of allocated stack area
-    the_thread->context.sp = (unsigned long long)the_thread->private_stack_ptr + USTACK_SIZE;
+    the_thread->context.sp = (unsigned long)the_thread->user_stack_ptr + USTACK_SIZE;
     the_thread->context.fp = the_thread->context.sp; // fp is the base addr, sp won't upper than fp
 
     // add it into run_queue tail
@@ -66,9 +65,10 @@ thread *thread_create(void *funcion_start_point) {
 }
 
 void from_el1_to_el0(thread *t) {
-    asm volatile("msr elr_el1, lr");
-    asm volatile("msr spsr_el1, %0" ::"r"(0x3c0));
-    asm volatile("msr sp_el0, %0" ::"r"(t->kernel_stack_ptr + KSTACK_SIZE));
+    asm volatile("msr elr_el1, lr");               // get back to caller function
+    asm volatile("msr spsr_el1, %0" ::"r"(0x3c0)); // enable E A I F
+    asm volatile("msr sp_el0, %0" ::"r"(t->context.sp));
+    asm volatile("mov sp, %0" ::"r"(t->kernel_stack_ptr + KSTACK_SIZE));
     asm volatile("eret");
 }
 
@@ -76,8 +76,6 @@ void from_el1_to_el0(thread *t) {
 void schedule() {
     // uart_sendline("scheduling...\n");
     lock();
-    // let program keep execute after 'eret'
-    // thread *tmp = cur_thread; // tmp is current process, cur_thread will be next process
     do {
         cur_thread = cur_thread->next;
     } while (cur_thread == run_queue);
@@ -114,7 +112,7 @@ void kill_zombie() {
             cur->prev->next = cur->next;
             // release memory
             kfree(cur->kernel_stack_ptr);
-            kfree(cur->private_stack_ptr);
+            kfree(cur->user_stack_ptr);
             // update thread status
             cur->isused = 0;
             cur->iszombie = 0;
