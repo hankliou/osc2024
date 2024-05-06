@@ -60,13 +60,6 @@ int exec(trap_frame *tpf, const char *name, char *const argv[]) {
 int fork(trap_frame *tpf) {
     lock();
 
-    // debug
-    uart_sendline("============\n");
-    for (thread *th = run_queue->next; th != run_queue; th = th->next) {
-        uart_sendline("thread in : %x\n", th);
-    }
-    uart_sendline("============\n");
-
     thread *child = thread_create(cur_thread->code);                              // create new thread
     thread *parent = cur_thread;                                                  // backup parent thread
     int parent_id = cur_thread->pid;                                              // record original pid
@@ -74,27 +67,20 @@ int fork(trap_frame *tpf) {
     memcpy(child->private_stack_ptr, cur_thread->private_stack_ptr, USTACK_SIZE); // copy user stack (deep copy)
     memcpy(child->kernel_stack_ptr, cur_thread->kernel_stack_ptr, KSTACK_SIZE);   // copy kernel stack
 
-    // debug
-    for (thread *th = run_queue->next; th != run_queue; th = th->next) {
-        uart_sendline("thread in : %x\n", th);
-    }
-    uart_sendline("============\n");
-
     // before coping context, update parent's context first!!!
     store_context(get_current());
 
     // child
     if (cur_thread->pid != parent_id) {
-        uart_sendline("child...\n");
         // TODO: explain why (parent's tpf + offset) = child's tpf
         // because the copied trap_frame still point to parent's trap_frame, so need to give it an offset
         unsigned long long offset = (unsigned long long)(child->kernel_stack_ptr) - (unsigned long long)(parent->kernel_stack_ptr);
         tpf = (trap_frame *)((char *)tpf + offset);
         tpf->sp_el0 += offset;
         tpf->x0 = 0;
+        unlock();
         return 0; // jump to link register
     }
-    uart_sendline("parent...\n");
     // copy parent's context
     child->context = cur_thread->context;
     // fix stacks's offset
@@ -103,7 +89,7 @@ int fork(trap_frame *tpf) {
     child->context.fp = child->context.fp + offset;
     child->context.sp = child->context.sp + offset;
 
-    tpf->x0 = child->pid;
+    tpf->x0 = child->pid; // return child's pid
     unlock();
     return child->pid; // return child's pid
 }

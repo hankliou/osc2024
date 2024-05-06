@@ -28,13 +28,13 @@ void el0_sync_router(trap_frame *tpf) {
     // return;
 
     int syscall_no = tpf->x8;
-    uart_sendline("syscall: %d\n", syscall_no);
+    // uart_sendline("syscall: %d\n", syscall_no);
     switch (syscall_no) {
     case 0:
         getpid(tpf);
         break;
     case 1:
-        // user have to allocate spaces to x0(buf) themself
+        // user have to allocate spaces to x0(buf) theirself
         uart_read(tpf, (char *)tpf->x0, tpf->x1);
         break;
     case 2:
@@ -58,7 +58,7 @@ void el0_sync_router(trap_frame *tpf) {
     default:
         uart_sendline("Invalid System Call Number\n");
     }
-    uart_sendline("syscall end\n");
+    // uart_sendline("syscall end\n");
 }
 
 void el1h_irq_router() {

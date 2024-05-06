@@ -10,7 +10,7 @@ unsigned int uart_tx_read = 0;
 unsigned int uart_tx_write = 0;
 unsigned int uart_rx_read = 0;
 unsigned int uart_rx_write = 0;
-int uart_recv_echo_flag = 0;
+int uart_recv_echo_flag = 1;
 
 void uart_init() {
     register unsigned int r;

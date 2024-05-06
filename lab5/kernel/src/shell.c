@@ -402,11 +402,6 @@ int test_fork() {
     asm volatile("mov x8, 4");
     asm volatile("svc 0");
     asm volatile("mov %0, x0" : "=r"(ret));
-
-    uart_sendline("fork: %d\n", ret);
-    int lr;
-    asm volatile("mov %0, lr" : "=r"(lr));
-    uart_sendline("lr 2...: %d\n", lr);
     return ret;
 }
 
@@ -432,8 +427,6 @@ void fork_test() {
     int cnt = 1;
     int ret;
     if ((ret = test_fork()) == 0) { // child
-        uart_sendline("children here????\n");
-        // while (1) {};
         long long cur_sp;
         asm volatile("mov %0, sp" : "=r"(cur_sp));
         uart_sendline("first child pid: %d, cnt: %d, ptr: %x, sp : %x\n", test_getpid(), cnt, &cnt, cur_sp);

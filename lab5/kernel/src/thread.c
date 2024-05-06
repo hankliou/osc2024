@@ -50,6 +50,7 @@ thread *thread_create(void *funcion_start_point) {
     the_thread->private_stack_ptr = kmalloc(USTACK_SIZE);
     the_thread->kernel_stack_ptr = kmalloc(KSTACK_SIZE);
     the_thread->context.lr = (unsigned long long)funcion_start_point;
+    the_thread->code = funcion_start_point;
     // sp init to the top of allocated stack area
     the_thread->context.sp = (unsigned long long)the_thread->private_stack_ptr + USTACK_SIZE;
     the_thread->context.fp = the_thread->context.sp; // fp is the base addr, sp won't upper than fp

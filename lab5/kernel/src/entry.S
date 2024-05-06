@@ -20,9 +20,11 @@
 
     /* store nested interrupt information */
     mrs     x0, spsr_el1            /* mrs: mov to reg from system */
-    str     x0, [sp, 16 * 16]       /* spsr_el1: saved processor state reg*/
+    str     x0, [sp, 16 * 15 + 8]   /* spsr_el1: saved processor state reg*/
     mrs     x0, elr_el1             /* elr:      exception link reg*/
-    str     x0, [sp, 16 * 17]
+    str     x0, [sp, 16 * 16]
+    mrs     x0, sp_el0
+    str     x0, [sp, 16 * 16 + 8]
     ldp     x0, x1, [sp, 16 * 0]    /* restore x0's val */
 .endm
 
@@ -46,10 +48,13 @@
     ldr     x30, [sp, 16 * 15]       /* store reg */
 
     /* load nested interrupt information */
-    ldr     x0, [sp, 16 * 16]            
-    msr     spsr_el1, x0
-    ldr     x0, [sp, 16 * 17]
+    ldr     x0, [sp, 16 * 15 + 8]
+    msr     spsr_el1,x0
+    ldr     x0, [sp, 16 * 16]
     msr     elr_el1, x0
+    ldr     x0, [sp, 16 * 16 + 8]
+    msr     sp_el0, x0
+    ldp     x0, x1, [sp ,16 * 0]  // restore x0 instead of elr_el1
 
     ldp     x0, x1, [sp, 16 * 0]
     add     sp, sp, 16 * 18
@@ -142,12 +147,13 @@ el1h_error_invalid:
     // load_state
     // eret
 
-el0_sync_64:
+el0_sync_64: // SVC
     save_state
     mov x0, sp
     bl el0_sync_router
     load_state
     eret
+
 el0_irq_64:
     // save_state
     // mov x0, 9
