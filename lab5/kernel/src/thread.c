@@ -5,13 +5,11 @@
 #include "u_string.h"
 #include "uart1.h"
 
-extern unsigned long switch_to();
-extern unsigned long get_current();
-
-int pid_cnt = 0;
 thread *run_queue;
 thread thread_list[MAXPID + 1];
 thread *cur_thread;
+
+int pid_cnt = 0;
 
 void init_thread() {
     lock();
@@ -21,7 +19,7 @@ void init_thread() {
     run_queue->prev = run_queue;
 
     for (int i = 0; i <= MAXPID; i++) {
-        // thread_list[i].isused = 0;
+        thread_list[i].isused = 0;
         thread_list[i].iszombie = 0;
         thread_list[i].pid = i;
     }
@@ -39,6 +37,7 @@ thread *thread_create(void *funcion_start_point) {
         return 0;
 
     // check the pid in thread_list, if not use yet, take it
+    // TODO: pid_cnt need to mod max size
     if (!thread_list[pid_cnt].isused)
         the_thread = &thread_list[pid_cnt++];
     else
@@ -48,7 +47,9 @@ thread *thread_create(void *funcion_start_point) {
     the_thread->iszombie = 0;
     the_thread->isused = 1;
     the_thread->user_stack_ptr = kmalloc(USTACK_SIZE);
+    // uart_sendline("ustack allocate: 0x%x\n", the_thread->user_stack_ptr);
     the_thread->kernel_stack_ptr = kmalloc(KSTACK_SIZE);
+    // uart_sendline("kstack allocate: 0x%x\n", the_thread->kernel_stack_ptr);
     the_thread->context.lr = (unsigned long)funcion_start_point;
     // sp init to the top of allocated stack area
     the_thread->context.sp = (unsigned long)the_thread->user_stack_ptr + USTACK_SIZE;
@@ -65,8 +66,9 @@ thread *thread_create(void *funcion_start_point) {
 }
 
 void from_el1_to_el0(thread *t) {
-    asm volatile("msr elr_el1, lr");               // get back to caller function
-    asm volatile("msr spsr_el1, %0" ::"r"(0x3c0)); // enable E A I F
+    asm volatile("msr tpidr_el1, %0" ::"r"(&t->context)); // hold the kernel(el1) thread structure info
+    asm volatile("msr elr_el1, lr");                      // get back to caller function
+    asm volatile("msr spsr_el1, %0" ::"r"(0x3c0));        // disable E A I F
     asm volatile("msr sp_el0, %0" ::"r"(t->context.sp));
     asm volatile("mov sp, %0" ::"r"(t->kernel_stack_ptr + KSTACK_SIZE));
     asm volatile("eret");
@@ -74,7 +76,6 @@ void from_el1_to_el0(thread *t) {
 
 // find a job to schedule, otherwise spinning til found
 void schedule() {
-    // uart_sendline("scheduling...\n");
     lock();
     do {
         cur_thread = cur_thread->next;
@@ -88,9 +89,6 @@ void schedule() {
 
 void idle() {
     // TODO: program will stuck in idle
-    // uart_sendline("idle...\n");
-    // for (int i = 0; i < 10000000; i++)
-    //     asm volatile("nop");
     kill_zombie();
     schedule();
 }
@@ -98,13 +96,12 @@ void idle() {
 void thread_exit() {
     lock();
     cur_thread->iszombie = 1;
-    uart_sendline("exiting\n");
     unlock();
     schedule();
 }
 
 void kill_zombie() {
-    // lock();
+    lock();
     for (thread *cur = run_queue->next; cur != run_queue; cur = cur->next) {
         if (cur->iszombie) {
             // remove from list
@@ -118,20 +115,25 @@ void kill_zombie() {
             cur->iszombie = 0;
         }
     }
-    // unlock();
+    unlock();
 }
 
 // for video player
 void thread_exec(char *code, char codesize) {
     // TODO
-    // thread *t = thread_create(code);
-    // t->code = kmalloc(codesize);
-    // t->codesize = codesize;
-    // t->context.lr = (unsigned long)t->code;
-
-    // memcpy(t->code, code, codesize);
-
-    // cur_thread = t;
+    thread *t = thread_create(code);
+    t->codesize = codesize;
+    t->code = kmalloc(codesize);
+    memcpy(t->code, code, codesize);
+    t->context.lr = (unsigned long)t->code;
+    cur_thread = t;
+    uart_sendline("hello\n");
+    asm volatile("msr tpidr_el1, %0;" ::"r"(&t->context));                // hold the "kernel(el1)" thread structure info
+    asm volatile("msr spsr_el1, %0;" ::"r"(0x3c0));                       // set state to user mode, and enable interrupt
+    asm volatile("msr elr_el1, %0;" ::"r"(t->context.lr));                // set exception return addr to 'c_filedata'
+    asm volatile("msr sp_el0, %0;" ::"r"(t->context.sp));                 // set el0's sp to top of new stack
+    asm volatile("mov sp, %0;" ::"r"(t->kernel_stack_ptr + KSTACK_SIZE)); // syscall use kernel stack
+    asm volatile("eret;");                                                // switch EL to 0
 }
 
 void schedule_timer() {

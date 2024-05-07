@@ -1,8 +1,5 @@
 #include "memory.h"
 #include "dtb.h"
-#include <stddef.h>
-#include <stdint.h>
-
 #include "uart1.h"
 
 extern char _heap_top;
@@ -89,11 +86,11 @@ void allocator_init() {
     // uart_sendline("Page size: %d Byte, total available frame: %d\n", PAGE_SIZE, MAX_PAGE);
     // uart_sendline("[Start up allocation]\n");
     // uart_sendline("\nSpin tables & DTB:");
-    dtb_get_reserved_memory(); // spin tables and dtb itself
+    // dtb_get_reserved_memory(); // spin tables and dtb itself
     // uart_sendline("\n_start ~ _end:");
-    memory_reserve((unsigned long long)&_start, (unsigned long long)&_end); // kernel image (stack, heap included)
+    // memory_reserve((unsigned long long)&_start, (unsigned long long)&_end); // kernel image (stack, heap included)
     // uart_sendline("\nCPIO_DEFAULT_START ~ CPIO_DEFAULT_END:");
-    memory_reserve((unsigned long long)CPIO_DEFAULT_START, (unsigned long long)CPIO_DEFAULT_END); // initramfs
+    // memory_reserve((unsigned long long)CPIO_DEFAULT_START, (unsigned long long)CPIO_DEFAULT_END); // initramfs
     // dump_free_frame_list();
 }
 
@@ -104,13 +101,13 @@ void *page_malloc(unsigned int size) {
     // uart_sendline("Request size: %d B (%d frames)\n", size, needed_frame);
 
     size = needed_frame; // turn size into frame (4KB = 2^12 bytes)
-    void *allocated_addr = NULL;
+    void *allocated_addr = (void *)0;
 
     // traverse and find available continuous frame
     for (int i = 0;; i++) {
         // failed
         if (i > MAX_PAGE_EXP) {
-            // uart_sendline("page malloc failed, no space left\n");
+            uart_sendline("page malloc failed, no space left\n");
             break;
         }
 
@@ -118,7 +115,8 @@ void *page_malloc(unsigned int size) {
         if ((1 << i) >= size && free_frame_list[i].next != &free_frame_list[i]) {
             // calculate address by frame index
             frame *node = free_frame_list[i].next;
-            allocated_addr = (void *)(((uintptr_t)(node->idx) << (PAGE_LEVEL + 3)) + ALLOCATION_BASE);
+            allocated_addr = (void *)(((uint64_t)(node->idx) << PAGE_LEVEL) + ALLOCATION_BASE);
+            // void *end = (void *)(((uint64_t)(node->idx + (1 << i)) << (PAGE_LEVEL)) + ALLOCATION_BASE);
 
             // uart_sendline("[allocte] From index %d, allocated %d frame with total size "
             //               "%d KB\n",
@@ -136,6 +134,8 @@ void *page_malloc(unsigned int size) {
 
             // release redundant frame
             release_redundant(node, size);
+
+            // uart_sendline("allocated address from %x ~ %x\n", allocated_addr, end);
             break;
         }
     }
@@ -166,7 +166,7 @@ void release_redundant(frame *node, unsigned int size) {
 // val = frame's level (2^val)
 void page_free(void *ptr) {
     // get the target in array: (addr - base) / 8(byte) / 4096(frame size)
-    frame *page_frame_ptr = &frame_array[((unsigned long long)ptr - ALLOCATION_BASE) >> (PAGE_LEVEL + 3)];
+    frame *page_frame_ptr = &frame_array[((unsigned long long)ptr - ALLOCATION_BASE) >> PAGE_LEVEL];
 
     // uart_sendline("[Free] From index %d, released %d frame with total size %d KB\n", page_frame_ptr->idx, (1 << page_frame_ptr->val),
     //               (1 << (page_frame_ptr->val + PAGE_LEVEL - 10)));
@@ -208,7 +208,7 @@ int coalesce(frame **ptr) {
         *ptr = buddy;
 
     // since merge, upgrade level
-    frame_ptr->val++;
+    (*ptr)->val++;
 
     return 0;
 }
@@ -233,7 +233,7 @@ void dump_free_frame_list() {
 void cut_page_to_slot(int expo) {
     // (char*) to index it Byte by Byte
     char *addr = page_malloc(PAGE_SIZE);
-    frame *page = &frame_array[((unsigned long long)addr - ALLOCATION_BASE) >> (PAGE_LEVEL + 3)];
+    frame *page = &frame_array[((unsigned long long)addr - ALLOCATION_BASE) >> PAGE_LEVEL];
     page->slot_level = expo;
 
     // insert_frame_node(page, &dynamic_mem_allocator_head[expo]);
@@ -282,7 +282,7 @@ void *dynamic_malloc(unsigned int size) {
 
 void dynamic_free(void *ptr) {
     // get the list to insert
-    int expo = frame_array[((unsigned long long)ptr - ALLOCATION_BASE) >> 15].slot_level;
+    int expo = frame_array[((unsigned long long)ptr - ALLOCATION_BASE) >> 12].slot_level;
     // type trans to re-get 'next', 'prev' field
     frame_slot *slot = (frame_slot *)ptr;
 
@@ -323,7 +323,7 @@ void *kmalloc(unsigned int size) {
 
 void kfree(void *ptr) {
     // if ptr's space in frame array has 'slot_level' attribute, use dynamic free
-    frame *the_frame = &frame_array[((unsigned long long)ptr - ALLOCATION_BASE) >> 15];
+    frame *the_frame = &frame_array[((unsigned long long)ptr - ALLOCATION_BASE) >> 12];
     if (the_frame->slot_level == NOT_A_SLOT)
         page_free(ptr);
     else
@@ -334,8 +334,8 @@ void kfree(void *ptr) {
 void memory_reserve(unsigned long long start, unsigned long long end) {
     // turn start, end into frame idx
     // uart_sendline("\nReserve Memory from 0x%8x to 0x%8x", start, end);
-    start = ((start - ALLOCATION_BASE) >> (PAGE_LEVEL + 3));
-    end = (end % (1 << (PAGE_LEVEL + 3))) == 0 ? ((end - ALLOCATION_BASE) >> (PAGE_LEVEL + 3)) : ((end - ALLOCATION_BASE) >> (PAGE_LEVEL + 3)) + 1;
+    start = ((start - ALLOCATION_BASE) >> PAGE_LEVEL);
+    end = (end % (1 << PAGE_LEVEL)) == 0 ? ((end - ALLOCATION_BASE) >> PAGE_LEVEL) : ((end - ALLOCATION_BASE) >> PAGE_LEVEL) + 1;
     // uart_sendline(" (frame %d ~ %d)\n", start, end);
 
     for (int expo = MAX_PAGE_EXP; expo >= 0; expo--) {
@@ -345,8 +345,8 @@ void memory_reserve(unsigned long long start, unsigned long long end) {
             int frame_start = it->idx, frame_end = it->idx + (1 << it->val); // get the range of frames
             // reserve
             if (start <= frame_start && frame_end <= end) {
-                // uart_sendline("[Reserve] 0x%8x ~ 0x%8x\n", ((it->idx << (PAGE_LEVEL + 3)) + ALLOCATION_BASE),
-                //               (((it->idx + (1 << it->val)) << (PAGE_LEVEL + 3)) + ALLOCATION_BASE));
+                // uart_sendline("[Reserve] 0x%8x ~ 0x%8x\n", ((it->idx << PAGE_LEVEL) + ALLOCATION_BASE),
+                //               (((it->idx + (1 << it->val)) << PAGE_LEVEL) + ALLOCATION_BASE));
                 it->used = FRAME_OCCUPIED_FLAG;
                 it->prev->next = it->next;
                 it->next->prev = it->prev;

@@ -3,7 +3,6 @@
 #include "memory.h"
 #include "u_string.h"
 #include "uart1.h"
-#include <stdint.h>
 
 // super good intro web page: https://zhuanlan.zhihu.com/p/144863497
 

@@ -10,13 +10,13 @@ void *kmalloc(unsigned int size);
 void kfree(void *ptr);
 
 // page related
-#define ALLOCATION_BASE 0x0 // 0x1000 0000 ~ 0x2000 0000 (bits)
+#define ALLOCATION_BASE 0x0 // 0x1000 0000 ~ 0x2000 0000 (byte)
 #define ALLOCATION_END 0x3C000000
-// #define ALLOCATION_BASE 0x10000000 // 0x1000 0000 ~ 0x2000 0000 (bits)
+// #define ALLOCATION_BASE 0x10000000 // 0x1000 0000 ~ 0x2000 0000 (byte)
 // #define ALLOCATION_END 0x20000000
-#define PAGE_SIZE 0x1000 // 4KB = 0x1000 bits
+#define PAGE_SIZE 0x1000 // 4KB = 0x1000 byte
 #define PAGE_LEVEL 12    // 4KB = (1 << 12)
-#define MAX_PAGE ((ALLOCATION_END - ALLOCATION_BASE) >> 3) / PAGE_SIZE
+#define MAX_PAGE (ALLOCATION_END - ALLOCATION_BASE) / PAGE_SIZE
 #define MAX_PAGE_EXP 10 // max 'val' field in frame (1024 continuous frames, 4096 KB)
 
 #define FRAME_FREE_FLAG -1

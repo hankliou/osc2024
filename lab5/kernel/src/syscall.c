@@ -13,9 +13,6 @@ extern thread thread_list[MAXPID + 1];
 
 extern void *CPIO_DEFAULT_START;
 
-extern void store_context(unsigned long int);
-extern unsigned long get_current();
-
 /*
     When it comes to system calls, the user software expects the kernel to take care of it.
     The program uses the general-purpose registers to set the arguments and receive the return value, just like conventional function calls.
@@ -53,6 +50,11 @@ size_t uart_write(trap_frame *tpf, const char buf[], size_t size) {
 
 // Note: In this lab, you won’t have to deal with argument passing, but you can still use it.
 int exec(trap_frame *tpf, const char *name, char *const argv[]) {
+    cur_thread->codesize = get_file_size((char *)name);
+    memcpy(cur_thread->code, get_file_start((char *)name), cur_thread->codesize);
+    tpf->elr_el1 = (unsigned long)cur_thread->code;
+    tpf->sp_el0 = (unsigned long)cur_thread->user_stack_ptr + USTACK_SIZE;
+    tpf->x0 = 0;
     return 0;
 }
 
@@ -60,12 +62,12 @@ int exec(trap_frame *tpf, const char *name, char *const argv[]) {
 int fork(trap_frame *tpf) {
     lock();
 
-    thread *child = thread_create(cur_thread->code);                            // create new thread
-    thread *parent = cur_thread;                                                // backup parent thread
-    int parent_id = cur_thread->pid;                                            // record original pid
-    child->codesize = cur_thread->codesize;                                     // assign size
-    memcpy(child->user_stack_ptr, cur_thread->user_stack_ptr, USTACK_SIZE);     // copy user stack (deep copy)
-    memcpy(child->kernel_stack_ptr, cur_thread->kernel_stack_ptr, KSTACK_SIZE); // copy kernel stack
+    thread *child = thread_create(cur_thread->code);                        // create new thread
+    thread *parent = cur_thread;                                            // backup parent thread
+    int parent_id = cur_thread->pid;                                        // record original pid
+    child->codesize = cur_thread->codesize;                                 // assign size
+    memcpy(child->kernel_stack_ptr, parent->kernel_stack_ptr, KSTACK_SIZE); // copy kernel stack (deep copy)
+    memcpy(child->user_stack_ptr, parent->user_stack_ptr, USTACK_SIZE);     // copy user stack (deep copy)
 
     // before coping context, update parent's context first!!!
     store_context(get_current());
@@ -86,8 +88,8 @@ int fork(trap_frame *tpf) {
     // fix stacks's offset
     // when create new thread, it will get a private/kernel stack space
     unsigned long long offset = (unsigned long long)(child->kernel_stack_ptr) - (unsigned long long)(parent->kernel_stack_ptr);
-    child->context.fp = child->context.fp + offset;
-    child->context.sp = child->context.sp + offset;
+    child->context.fp += offset;
+    child->context.sp += offset;
 
     tpf->x0 = child->pid; // return child's pid
     unlock();
@@ -108,7 +110,7 @@ int mbox_call(trap_frame *tpf, unsigned char ch, unsigned int *mbox) {
     while (1) {
         while (*MBOX_STATUS & BCM_ARM_VC_MS_EMPTY) {}
         if (*MBOX_READ == r) {
-            tpf->x0 = (mbox[1] == MOBX_REQUEST_SUCCEED);
+            tpf->x0 = (mbox[1] == MBOX_REQUEST_SUCCEED);
             unlock();
             return tpf->x0;
         }

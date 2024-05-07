@@ -16,7 +16,7 @@ int k_mbox_call(mbox_channel_type channel, unsigned int value) {
     while (1) {
         while (*MBOX_STATUS & BCM_ARM_VC_MS_EMPTY) {} // wait until mail box not empty
         if (value == *MBOX_READ)                      // read from reg
-            return pt[1] == MOBX_REQUEST_SUCCEED;
+            return pt[1] == MBOX_REQUEST_SUCCEED;
     }
     return 0;
 }

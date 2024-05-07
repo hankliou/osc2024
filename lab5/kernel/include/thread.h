@@ -5,6 +5,10 @@
 #define USTACK_SIZE 0x10000
 #define KSTACK_SIZE 0x10000
 
+extern void *switch_to(void *curr_context, void *next_context);
+extern void *get_current();
+extern void *store_context(void *cur_context);
+
 typedef struct thread_context {
     // callee saved registers
     // https://developer.arm.com/documentation/102374/0101/Procedure-Call-Standard

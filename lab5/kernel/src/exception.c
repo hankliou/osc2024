@@ -27,6 +27,7 @@ void el0_sync_router(trap_frame *tpf) {
     // uart_sendline("spsr_el1: %x, elr_el1: %x, esr_el1: %x\n", spsrel1, elrel1, esrel1);
     // return;
 
+    el1_interrupt_enable();
     int syscall_no = tpf->x8;
     // uart_sendline("syscall: %d\n", syscall_no);
     switch (syscall_no) {

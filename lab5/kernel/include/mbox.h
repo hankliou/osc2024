@@ -26,8 +26,8 @@ enum mbox_status_reg_bits {
 
 enum mbox_buffer_status_code {
     MBOX_REQUEST_PROCESS = 0x00000000,
-    MOBX_REQUEST_SUCCEED = 0x80000000,
-    MOBX_REQUEST_FAILED = 0x80000001,
+    MBOX_REQUEST_SUCCEED = 0x80000000,
+    MBOX_REQUEST_FAILED = 0x80000001,
 };
 
 // Tag

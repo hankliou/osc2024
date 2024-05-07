@@ -53,13 +53,13 @@ void do_cmd_exec(char *filepath) {
 
         // if match
         if (strcmp(c_filepath, filepath) == 0) {
-            // exec c_filedata
-            char *ustack = simple_malloc(256);
-            asm volatile("msr spsr_el1, %0;" ::"r"(0x3c0));      // set state to user mode, and enable interrupt
-            asm volatile("msr elr_el1, %0;" ::"r"(c_filedata));  // set exception return addr to 'c_filedata'
-            asm volatile("msr sp_el0, %0;" ::"r"(ustack + 256)); // set el0's sp to top of new stack
-            asm volatile("eret;");                               // switch EL to 0
-
+            // char *ustack = simple_malloc(256);
+            // asm volatile("msr spsr_el1, %0;" ::"r"(0x3c0));      // set state to user mode, and enable interrupt
+            // asm volatile("msr elr_el1, %0;" ::"r"(c_filedata));  // set exception return addr to 'c_filedata'
+            // asm volatile("msr sp_el0, %0;" ::"r"(ustack + 256)); // set el0's sp to top of new stack
+            // asm volatile("eret;");                               // switch EL to 0
+            uart_recv_echo_flag = 0;
+            thread_exec(c_filedata, c_filesize);
             break;
         }
 
@@ -90,23 +90,30 @@ void cli_cmd_clear(char *buffer, int length) {
 };
 
 void cli_cmd_read(char *buffer) {
-    char c = '\0';
     int idx = 0;
-    while (1) {
-        if (idx >= CMD_MAX_LEN)
-            break;
 
-        c = uart_async_getc();
-        // c = uart_recv();
+    while (1) {
+        char c = uart_async_getc();
+
         if (c == '\n') {
-            uart_sendline("\r\n");
+            // uart_send(c);
+            buffer[idx] = '\0';
             break;
+        } else if (c >= 32 && c <= 126) {
+            // uart_send(c);
+            buffer[idx++] = c;
+        } else if (c == 127) {
+            // Handle backspaces
+            if (idx > 0) {
+                buffer[idx--] = 0;
+                uart_send('\b');
+                uart_send(' ');
+                uart_send('\b');
+            }
+        } else {
+            // Ignore unprintable chars
+            continue;
         }
-        if (c > 16 && c < 32)
-            continue;
-        if (c > 127)
-            continue;
-        buffer[idx++] = c;
     }
 }
 
@@ -331,21 +338,27 @@ void do_cmd_setTimer(char *msg, int sec) {
 }
 
 void do_cmd_mem_test() {
-    char *p1 = kmalloc(0x820);
-    char *p2 = kmalloc(0x900);
-    char *p3 = kmalloc(0x2000);
-    char *p4 = kmalloc(0x3900);
-    kfree(p3);
-    kfree(p4);
-    kfree(p1);
-    kfree(p2);
-    char *a = kmalloc(0x10);
-    char *b = kmalloc(0x100);
-    char *c = kmalloc(0x1000);
+    // char *p1 = kmalloc(8192);
+    // char *p2 = kmalloc(8192);
+    // char *p3 = kmalloc(8192);
+    // kfree(p1);
+    // kfree(p2);
+    // kfree(p3);
+    char *p1 = kmalloc(0x82000);
+    char *p2 = kmalloc(0x90000);
+    char *p3 = kmalloc(0x200000);
+    char *p4 = kmalloc(0x390000);
+    // kfree(p3);
+    // kfree(p4);
+    // kfree(p1);
+    // kfree(p2);
+    char *a = kmalloc(0x1000);
+    char *b = kmalloc(0x10000);
+    char *c = kmalloc(0x100000);
 
-    kfree(a);
-    kfree(b);
-    kfree(c);
+    // kfree(a);
+    // kfree(b);
+    // kfree(c);
 
     a = kmalloc(32);
     char *aa = kmalloc(50);
@@ -425,7 +438,7 @@ void fork_test() {
 
     uart_sendline("\nFork Test, pid %d\n", test_getpid());
     int cnt = 1;
-    int ret = 0;
+    int ret = 999;
     if ((ret = test_fork()) == 0) { // child
         long long cur_sp;
         asm volatile("mov %0, sp" : "=r"(cur_sp));
@@ -451,7 +464,7 @@ void fork_test() {
     }
 }
 
-// run in kernel space
+// // run in kernel space
 // void fork_test() {
 //     trap_frame *tpf = kmalloc(sizeof(trap_frame));
 //     uart_sendline("\nFork Test, pid %d\n", getpid(tpf));
