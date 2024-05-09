@@ -74,15 +74,16 @@ int fork(trap_frame *tpf) {
 
     // child
     if (cur_thread->pid != parent_id) {
-        // TODO: explain why (parent's tpf + offset) = child's tpf
+        // TODO: explain why (parent's tpf + offset) = child's tpf -> because tpf in inside kernel stack
         // because the copied trap_frame still point to parent's trap_frame, so need to give it an offset
         unsigned long long offset = (unsigned long long)(child->kernel_stack_ptr) - (unsigned long long)(parent->kernel_stack_ptr);
-        tpf = (trap_frame *)((char *)tpf + offset);
+        tpf = (trap_frame *)((char *)tpf + offset); // move child's tpf to "child's tpf in its stack"
         tpf->sp_el0 += offset;
         tpf->x0 = 0;
         unlock();
         return 0; // jump to link register
     }
+
     // copy parent's context
     child->context = cur_thread->context;
     // fix stacks's offset

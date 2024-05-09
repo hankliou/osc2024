@@ -68,7 +68,7 @@ thread *thread_create(void *funcion_start_point) {
 void from_el1_to_el0(thread *t) {
     asm volatile("msr tpidr_el1, %0" ::"r"(&t->context)); // hold the kernel(el1) thread structure info
     asm volatile("msr elr_el1, lr");                      // get back to caller function
-    asm volatile("msr spsr_el1, %0" ::"r"(0x3c0));        // disable E A I F
+    asm volatile("msr spsr_el1, %0" ::"r"(0x340));        // disable E A I F
     asm volatile("msr sp_el0, %0" ::"r"(t->context.sp));
     asm volatile("mov sp, %0" ::"r"(t->kernel_stack_ptr + KSTACK_SIZE));
     asm volatile("eret");
@@ -136,15 +136,13 @@ void thread_exec(char *code, char codesize) {
 }
 
 void schedule_timer() {
-    unsigned long long timeout;
-    asm volatile("mrs %0, cntfrq_el0;" : "=r"(timeout));
-    add_timer(schedule_timer, "re-schedule", timeout >> 5);
+    add_timer(schedule_timer, "re-schedule", getTimerFreq() >> 5);
 }
 
 void foo() {
     for (int i = 0; i < 10; ++i) {
         uart_sendline("Thread id: %d %d\n", cur_thread->pid, i);
-        for (int j = 0; j < 1000000; j++)
+        for (int j = 0; j < 50000000; j++)
             asm volatile("nop\n\t");
         schedule();
     }

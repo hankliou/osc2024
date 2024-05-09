@@ -8,6 +8,7 @@
 #include "uart1.h"
 
 irq_node *irq_head; // head is empty, every node come after head
+extern thread *run_queue;
 
 void lock() {
     el1_interrupt_disable();
@@ -18,14 +19,14 @@ void unlock() {
 }
 
 void el0_sync_router(trap_frame *tpf) {
-    unsigned long long spsrel1;
-    asm volatile("mrs %0, spsr_el1" : "=r"(spsrel1));
-    unsigned long long elrel1;
-    asm volatile("mrs %0, elr_el1" : "=r"(elrel1));
-    unsigned long long esrel1;
-    asm volatile("mrs %0, esr_el1" : "=r"(esrel1));
-    uart_sendline("spsr_el1: %x, elr_el1: %x, esr_el1: %x\n", spsrel1, elrel1, esrel1);
-    return;
+    // unsigned long long spsrel1;
+    // asm volatile("mrs %0, spsr_el1" : "=r"(spsrel1));
+    // unsigned long long elrel1;
+    // asm volatile("mrs %0, elr_el1" : "=r"(elrel1));
+    // unsigned long long esrel1;
+    // asm volatile("mrs %0, esr_el1" : "=r"(esrel1));
+    // uart_sendline("spsr_el1: %x, elr_el1: %x, esr_el1: %x\n", spsrel1, elrel1, esrel1);
+    // return;
 
     el1_interrupt_enable();
     int syscall_no = tpf->x8;
@@ -81,7 +82,9 @@ void el1h_irq_router() {
         timer_disable_interrupt();
         add_irq_task(timer_handler, TIMER_IRQ_PRIORITY);
         timer_enable_interrupt();
-        // schedule();
+        // at least two thread running -> schedule for any timer irq
+        if (run_queue->next->next != run_queue)
+            schedule();
     }
 }
 

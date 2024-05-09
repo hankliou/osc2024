@@ -164,9 +164,9 @@ void cli_cmd_exec(char *buffer) {
         do_cmd_testAsyncUart();
     } else if (strcmp(cmd, "mem_test") == 0) {
         do_cmd_mem_test();
-    } else if (strcmp(cmd, "thread_test") == 0) {
+    } else if (strcmp(cmd, "t") == 0) {
         do_cmd_thread_test();
-    } else if (strcmp(cmd, "s") == 0) {
+    } else if (strcmp(cmd, "syscall_test") == 0) {
         do_cmd_syscall_test();
     } else {
         uart_sendline("%s : command not found\n", cmd);
@@ -330,11 +330,11 @@ void do_cmd_set2sTimer(char *msg) {
     asm volatile("mrs %0, cntfrq_el0\n\t" : "=r"(cntfrq_el0));
     uart_sendline("[Interrupt][el1_irq][%s] %d seconds after booting\n", msg, cntpct_el0 / cntfrq_el0);
 
-    add_timer(do_cmd_set2sTimer, msg, 2);
+    add_timer(do_cmd_set2sTimer, msg, 2 * getTimerFreq());
 }
 
 void do_cmd_setTimer(char *msg, int sec) {
-    add_timer(timer_print_msg, msg, sec);
+    add_timer(timer_print_msg, msg, sec * getTimerFreq());
 }
 
 void do_cmd_mem_test() {
@@ -392,10 +392,11 @@ void do_cmd_mem_test() {
 }
 
 void do_cmd_thread_test() {
-    for (int i = 0; i < 5; i++) {
-        uart_sendline("testing: %d\n", thread_create(foo)->pid);
-    }
-    idle();
+    // for (int i = 0; i < 5; i++) {
+    //     uart_sendline("testing: %d\n", thread_create(foo)->pid);
+    // }
+    schedule_timer();
+    // idle();
 }
 
 void do_cmd_syscall_test() {
@@ -445,16 +446,36 @@ void test_exit() {
     asm volatile("svc 0");
 }
 
+int test_mbox_call(unsigned char ch, unsigned int *mbox) {
+    int ret = 0;
+    asm volatile("mov x1, %0" ::"r"(mbox));
+    asm volatile("mov x0, %0" ::"r"(ch));
+    asm volatile("mov x8, 6");
+    asm volatile("svc 0");
+    asm volatile("mov %0, x0" : "=r"(ret));
+    return ret;
+}
+
+void test_kill(int pid) {
+    asm volatile("mov x0, %0" ::"r"(pid));
+    asm volatile("mov x8, 7");
+    asm volatile("svc 0");
+}
+
 // run in user space
 void fork_test() {
     // switch to user space
     from_el1_to_el0(cur_thread);
 
+    // uart I/O test
     char buf[128];
     uart_sendline("Input : ");
     test_uart_read(buf, 5);
     test_uart_write(buf, sizeof(buf));
 
+    // mailbox test
+
+    // fork test
     uart_sendline("\nFork Test, pid %d\n", test_getpid());
     int cnt = 1;
     int ret = 999;
@@ -480,6 +501,10 @@ void fork_test() {
         uart_sendline("parent here, pid %d, child %d\n", test_getpid(), ret);
     }
     test_exit();
+
+    // kill test
+    // test_kill(test_getpid());
+    // uart_sendline("failed to suicide\n");
 }
 
 // // run in kernel space
