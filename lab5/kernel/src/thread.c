@@ -127,7 +127,6 @@ void thread_exec(char *code, char codesize) {
     memcpy(t->code, code, codesize);
     t->context.lr = (unsigned long)t->code;
     cur_thread = t;
-    uart_sendline("hello\n");
     asm volatile("msr tpidr_el1, %0;" ::"r"(&t->context));                // hold the "kernel(el1)" thread structure info
     asm volatile("msr spsr_el1, %0;" ::"r"(0x3c0));                       // set state to user mode, and enable interrupt
     asm volatile("msr elr_el1, %0;" ::"r"(t->context.lr));                // set exception return addr to 'c_filedata'

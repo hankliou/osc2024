@@ -18,14 +18,14 @@ void unlock() {
 }
 
 void el0_sync_router(trap_frame *tpf) {
-    // unsigned long long spsrel1;
-    // asm volatile("mrs %0, spsr_el1" : "=r"(spsrel1));
-    // unsigned long long elrel1;
-    // asm volatile("mrs %0, elr_el1" : "=r"(elrel1));
-    // unsigned long long esrel1;
-    // asm volatile("mrs %0, esr_el1" : "=r"(esrel1));
-    // uart_sendline("spsr_el1: %x, elr_el1: %x, esr_el1: %x\n", spsrel1, elrel1, esrel1);
-    // return;
+    unsigned long long spsrel1;
+    asm volatile("mrs %0, spsr_el1" : "=r"(spsrel1));
+    unsigned long long elrel1;
+    asm volatile("mrs %0, elr_el1" : "=r"(elrel1));
+    unsigned long long esrel1;
+    asm volatile("mrs %0, esr_el1" : "=r"(esrel1));
+    uart_sendline("spsr_el1: %x, elr_el1: %x, esr_el1: %x\n", spsrel1, elrel1, esrel1);
+    return;
 
     el1_interrupt_enable();
     int syscall_no = tpf->x8;
@@ -92,6 +92,7 @@ void invalid_exception_router() {
 
 /* implement preemption */
 void irqtask_list_init() {
+    irq_head = simple_malloc(sizeof(irq_node));
     irq_head->next = irq_head;
     irq_head->prev = irq_head;
 }
@@ -114,8 +115,6 @@ void el1_interrupt_disable() {
 void add_irq_task(void *callback, unsigned priority) {
     // init node
     irq_node *node = simple_malloc(sizeof(irq_node));
-    node->next = irq_head;
-    node->prev = irq_head;
     node->priority = priority;
     node->task_function = callback;
 

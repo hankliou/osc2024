@@ -338,27 +338,21 @@ void do_cmd_setTimer(char *msg, int sec) {
 }
 
 void do_cmd_mem_test() {
-    // char *p1 = kmalloc(8192);
-    // char *p2 = kmalloc(8192);
-    // char *p3 = kmalloc(8192);
-    // kfree(p1);
-    // kfree(p2);
-    // kfree(p3);
     char *p1 = kmalloc(0x82000);
     char *p2 = kmalloc(0x90000);
     char *p3 = kmalloc(0x200000);
     char *p4 = kmalloc(0x390000);
-    // kfree(p3);
-    // kfree(p4);
-    // kfree(p1);
-    // kfree(p2);
+    kfree(p3);
+    kfree(p4);
+    kfree(p1);
+    kfree(p2);
     char *a = kmalloc(0x1000);
     char *b = kmalloc(0x10000);
     char *c = kmalloc(0x100000);
 
-    // kfree(a);
-    // kfree(b);
-    // kfree(c);
+    kfree(a);
+    kfree(b);
+    kfree(c);
 
     a = kmalloc(32);
     char *aa = kmalloc(50);
@@ -410,17 +404,37 @@ void do_cmd_syscall_test() {
     schedule();
 }
 
-int test_fork() {
+int test_getpid() {
     int ret = 0;
-    asm volatile("mov x8, 4");
+    asm volatile("mov x8, 0");
     asm volatile("svc 0");
     asm volatile("mov %0, x0" : "=r"(ret));
     return ret;
 }
 
-int test_getpid() {
+size_t test_uart_read(char *buf, size_t size) {
     int ret = 0;
-    asm volatile("mov x8, 0");
+    asm volatile("mov x1, %0" ::"r"(size));
+    asm volatile("mov x0, %0" ::"r"(buf));
+    asm volatile("mov x8, 1");
+    asm volatile("svc 0");
+    asm volatile("mov %0, x0" : "=r"(ret));
+    return ret;
+}
+
+size_t test_uart_write(const char *buf, size_t size) {
+    int ret = 0;
+    asm volatile("mov x1, %0" ::"r"(size));
+    asm volatile("mov x0, %0" ::"r"(buf));
+    asm volatile("mov x8, 2");
+    asm volatile("svc 0");
+    asm volatile("mov %0, x0" : "=r"(ret));
+    return ret;
+}
+
+int test_fork() {
+    int ret = 0;
+    asm volatile("mov x8, 4");
     asm volatile("svc 0");
     asm volatile("mov %0, x0" : "=r"(ret));
     return ret;
@@ -435,6 +449,11 @@ void test_exit() {
 void fork_test() {
     // switch to user space
     from_el1_to_el0(cur_thread);
+
+    char buf[128];
+    uart_sendline("Input : ");
+    test_uart_read(buf, 5);
+    test_uart_write(buf, sizeof(buf));
 
     uart_sendline("\nFork Test, pid %d\n", test_getpid());
     int cnt = 1;
@@ -457,11 +476,10 @@ void fork_test() {
                 ++cnt;
             }
         }
-        test_exit();
     } else {
         uart_sendline("parent here, pid %d, child %d\n", test_getpid(), ret);
-        test_exit();
     }
+    test_exit();
 }
 
 // // run in kernel space
