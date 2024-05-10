@@ -43,14 +43,14 @@ typedef struct thread {
 } thread;
 
 void init_thread();
-thread *thread_create(void *funcion_start_point); // runable function
-void schedule();                                  // switch to next job
-void idle();                                      // keep scheduling
-void thread_exit();                               // mark thread 'zombie'
-void kill_zombie();                               // remove zombie process
-void thread_exec(char *code, char codesize);      // exec task in new thread
-void schedule_timer();                            // basic 3, "Set the expired time as core timer frequency shift right 5 bits."
-void foo();                                       // test function
-void from_el1_to_el0(thread *t);                  // switch to user space
+thread *thread_create(void *funcion_start_point);    // runable function
+void schedule();                                     // switch to next job
+void idle();                                         // keep scheduling
+void thread_exit();                                  // mark thread 'zombie'
+void kill_zombie();                                  // remove zombie process
+void thread_exec(char *code, unsigned int codesize); // exec task in new thread
+void schedule_timer();                               // basic 3, "Set the expired time as core timer frequency shift right 5 bits."
+void foo();                                          // test function
+void from_el1_to_el0(thread *t);                     // switch to user space
 
 #endif /* _THREAD_H_ */

@@ -119,7 +119,7 @@ void kill_zombie() {
 }
 
 // for video player
-void thread_exec(char *code, char codesize) {
+void thread_exec(char *code, unsigned int codesize) {
     // TODO
     thread *t = thread_create(code);
     t->codesize = codesize;
@@ -127,7 +127,7 @@ void thread_exec(char *code, char codesize) {
     memcpy(t->code, code, codesize);
     t->context.lr = (unsigned long)t->code;
     cur_thread = t;
-    add_timer(schedule_timer, "", getTimerFreq());
+    // add_timer(schedule_timer, "", getTimerFreq());
     uart_sendline("exec: timer set\n");
     asm volatile("msr tpidr_el1, %0;" ::"r"(&t->context)); // hold the "kernel(el1)" thread structure info
     asm volatile("msr spsr_el1, %0;" ::"r"(0x0));          // set state to user mode, and enable interrupt
