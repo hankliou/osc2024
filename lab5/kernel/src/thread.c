@@ -127,7 +127,7 @@ void thread_exec(char *code, unsigned int codesize) {
     memcpy(t->code, code, codesize);
     t->context.lr = (unsigned long)t->code;
     cur_thread = t;
-    // add_timer(schedule_timer, "", getTimerFreq());
+    add_timer(schedule_timer, "", getTimerFreq());
     uart_sendline("exec: timer set\n");
     asm volatile("msr tpidr_el1, %0;" ::"r"(&t->context)); // hold the "kernel(el1)" thread structure info
     asm volatile("msr spsr_el1, %0;" ::"r"(0x0));          // set state to user mode, and enable interrupt
@@ -137,7 +137,8 @@ void thread_exec(char *code, unsigned int codesize) {
 }
 
 void schedule_timer() {
-    add_timer(schedule_timer, "re-schedule", getTimerFreq() >> 5);
+    add_timer(schedule_timer, "re-schedule", getTimerFreq());
+    // add_timer(schedule_timer, "re-schedule", getTimerFreq() >> 5);
 }
 
 void foo() {

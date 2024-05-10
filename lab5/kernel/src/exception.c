@@ -66,6 +66,7 @@ void el0_sync_router(trap_frame *tpf) {
 void el1h_irq_router() {
     // uart
     if (*IRQ_PENDING_1 & (1 << 29)) {
+        uart_sendline("uart INT\n");
         switch (*AUX_MU_IIR_REG & 0x6) {
         case 0x2: // transmit interrupt
             uart_tx_irq_disable();
@@ -79,6 +80,7 @@ void el1h_irq_router() {
     }
     // timer
     else if (*CORE0_INTERRUPT_SOURCE & 0x2) {
+        uart_sendline("timer INT\n");
         timer_disable_interrupt();
         add_irq_task(timer_handler, TIMER_IRQ_PRIORITY);
         timer_enable_interrupt();
@@ -88,8 +90,11 @@ void el1h_irq_router() {
     }
 }
 
-void invalid_exception_router() {
-    uart_sendline("invalid exception !\n");
+void invalid_exception_router(int no) {
+    uart_sendline("invalid exception [%d]\n", no);
+    unsigned long esr;
+    asm volatile("mrs %0, esr_el1" : "=r"(esr));
+    uart_sendline("esr_el1: %x\n", esr);
     while (1) {};
 }
 
