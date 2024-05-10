@@ -66,28 +66,26 @@ int fork(trap_frame *tpf) {
     thread *parent = cur_thread;                                            // backup parent thread
     int parent_id = cur_thread->pid;                                        // record original pid
     child->codesize = cur_thread->codesize;                                 // assign size
-    memcpy(child->kernel_stack_ptr, parent->kernel_stack_ptr, KSTACK_SIZE); // copy kernel stack (deep copy)
     memcpy(child->user_stack_ptr, parent->user_stack_ptr, USTACK_SIZE);     // copy user stack (deep copy)
+    memcpy(child->kernel_stack_ptr, parent->kernel_stack_ptr, KSTACK_SIZE); // copy kernel stack (deep copy)
 
     // before coping context, update parent's context first!!!
-    store_context(get_current());
+    store_context(get_current()); // mainly storing lr and sp
 
     // child
     if (cur_thread->pid != parent_id) {
-        // TODO: explain why (parent's tpf + offset) = child's tpf -> because tpf in inside kernel stack
-        // because the copied trap_frame still point to parent's trap_frame, so need to give it an offset
-        unsigned long long offset = (unsigned long long)(child->kernel_stack_ptr) - (unsigned long long)(parent->kernel_stack_ptr);
-        tpf = (trap_frame *)((char *)tpf + offset); // move child's tpf to "child's tpf in its stack"
-        tpf->sp_el0 += offset;
+        // child move it's "tpf" pointer to it's trap_frame
+        tpf = (trap_frame *)((char *)tpf + (child->kernel_stack_ptr - parent->kernel_stack_ptr)); // trap frame in kernel stack
+        // child move it's "user sp" with same offset of it's parent
+        tpf->sp_el0 += child->user_stack_ptr - parent->user_stack_ptr;
         tpf->x0 = 0;
         unlock();
         return 0; // jump to link register
     }
 
-    // copy parent's context
+    // copy parent's context to child
     child->context = cur_thread->context;
-    // fix stacks's offset
-    // when create new thread, it will get a private/kernel stack space
+    // update an offset to child's sp, so after jump with "lr", "sp" will be correct
     unsigned long long offset = (unsigned long long)(child->kernel_stack_ptr) - (unsigned long long)(parent->kernel_stack_ptr);
     child->context.fp += offset;
     child->context.sp += offset;

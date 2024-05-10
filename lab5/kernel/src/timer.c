@@ -73,7 +73,6 @@ void add_timer(void *callback, char *msg, unsigned long long timeout) {
     node->callback = callback;
     unsigned long long tick;
     asm volatile("mrs %0, cntpct_el0" : "=r"(tick));
-    // asm volatile("mrs %0, cntfrq_el0" : "=r"(freq));
     node->interrupt_time = timeout + tick;
     node->msg = simple_malloc(strlen(msg) + 1); // need to free when times up(in timer_handler)
     strcpy(node->msg, msg);

@@ -31,7 +31,7 @@ proc_hang:
 from_el2_to_el1:
     mov x1, (1 << 31) // EL1 uses aarch64
     msr hcr_el2, x1
-    mov x1, 0x345 // EL1h (SPSel = 1) with interrupt disabled
+    mov x1, 0x345 // EL1h (SPSel = 1) with interrupt disabled (EAIF)
     msr spsr_el2, x1
     msr elr_el2, lr
     eret // return to EL1

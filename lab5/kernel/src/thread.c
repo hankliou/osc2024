@@ -127,12 +127,13 @@ void thread_exec(char *code, char codesize) {
     memcpy(t->code, code, codesize);
     t->context.lr = (unsigned long)t->code;
     cur_thread = t;
-    asm volatile("msr tpidr_el1, %0;" ::"r"(&t->context));                // hold the "kernel(el1)" thread structure info
-    asm volatile("msr spsr_el1, %0;" ::"r"(0x3c0));                       // set state to user mode, and enable interrupt
-    asm volatile("msr elr_el1, %0;" ::"r"(t->context.lr));                // set exception return addr to 'c_filedata'
-    asm volatile("msr sp_el0, %0;" ::"r"(t->context.sp));                 // set el0's sp to top of new stack
-    asm volatile("mov sp, %0;" ::"r"(t->kernel_stack_ptr + KSTACK_SIZE)); // syscall use kernel stack
-    asm volatile("eret;");                                                // switch EL to 0
+    add_timer(schedule_timer, "", getTimerFreq());
+    uart_sendline("exec: timer set\n");
+    asm volatile("msr tpidr_el1, %0;" ::"r"(&t->context)); // hold the "kernel(el1)" thread structure info
+    asm volatile("msr spsr_el1, %0;" ::"r"(0x0));          // set state to user mode, and enable interrupt
+    asm volatile("msr elr_el1, %0;" ::"r"(t->context.lr)); // set exception return addr to 'c_filedata'
+    asm volatile("msr sp_el0, %0;" ::"r"(t->context.sp));  // set el0's sp to top of new stack
+    asm volatile("eret;");                                 // switch EL to 0
 }
 
 void schedule_timer() {

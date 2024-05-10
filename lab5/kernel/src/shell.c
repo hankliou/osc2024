@@ -164,7 +164,7 @@ void cli_cmd_exec(char *buffer) {
         do_cmd_testAsyncUart();
     } else if (strcmp(cmd, "mem_test") == 0) {
         do_cmd_mem_test();
-    } else if (strcmp(cmd, "t") == 0) {
+    } else if (strcmp(cmd, "thread_test") == 0) {
         do_cmd_thread_test();
     } else if (strcmp(cmd, "syscall_test") == 0) {
         do_cmd_syscall_test();
@@ -392,9 +392,9 @@ void do_cmd_mem_test() {
 }
 
 void do_cmd_thread_test() {
-    // for (int i = 0; i < 5; i++) {
-    //     uart_sendline("testing: %d\n", thread_create(foo)->pid);
-    // }
+    for (int i = 0; i < 5; i++) {
+        uart_sendline("testing: %d\n", thread_create(foo)->pid);
+    }
     schedule_timer();
     // idle();
 }
