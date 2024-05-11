@@ -1,6 +1,7 @@
 #include "thread.h"
 #include "exception.h"
 #include "memory.h"
+#include "signal.h"
 #include "timer.h"
 #include "u_string.h"
 #include "uart1.h"
@@ -17,6 +18,7 @@ void init_thread() {
     run_queue = kmalloc(sizeof(thread));
     run_queue->next = run_queue;
     run_queue->prev = run_queue;
+    run_queue->pid = -1; // debug usage
 
     for (int i = 0; i <= MAXPID; i++) {
         thread_list[i].isused = 0;
@@ -55,6 +57,13 @@ thread *thread_create(void *funcion_start_point) {
     the_thread->context.sp = (unsigned long)the_thread->user_stack_ptr + USTACK_SIZE;
     the_thread->context.fp = the_thread->context.sp; // fp is the base addr, sp won't upper than fp
 
+    // signal
+    the_thread->signal_inProcess = 0;
+    for (int i = 0; i < SIGNAL_MAX; i++) {
+        the_thread->sigcount[i] = 0;
+        the_thread->signal_handler[i] = signal_default_handler;
+    }
+
     // add it into run_queue tail
     the_thread->prev = run_queue->prev;
     the_thread->next = run_queue;
@@ -77,20 +86,22 @@ void from_el1_to_el0(thread *t) {
 // find a job to schedule, otherwise spinning til found
 void schedule() {
     lock();
+
     do {
         cur_thread = cur_thread->next;
     } while (cur_thread == run_queue);
+    unlock();
 
     // context switch (defined in asm)
     // pass both thread's addr as base addr, to load/store the registers
     switch_to(get_current(), &cur_thread->context);
-    unlock();
 }
 
 void idle() {
-    // TODO: program will stuck in idle
-    kill_zombie();
-    schedule();
+    while (1) {
+        kill_zombie();
+        schedule();
+    };
 }
 
 void thread_exit() {
@@ -124,18 +135,21 @@ void thread_exec(char *code, unsigned int codesize) {
     thread *t = thread_create(code);
     t->codesize = codesize;
     t->code = kmalloc(codesize);
+    uart_sendline("code: %x\n", t->code);
     memcpy(t->code, code, codesize);
     t->context.lr = (unsigned long)t->code;
     cur_thread = t;
-    add_timer(schedule_timer, "", getTimerFreq());
     uart_sendline("exec: timer set\n");
-    asm volatile("msr tpidr_el1, %0;" ::"r"(&t->context)); // hold the "kernel(el1)" thread structure info
-    asm volatile("msr spsr_el1, %0;" ::"r"(0x0));          // set state to user mode, and enable interrupt
-    asm volatile("msr elr_el1, %0;" ::"r"(t->context.lr)); // set exception return addr to 'c_filedata'
-    asm volatile("msr sp_el0, %0;" ::"r"(t->context.sp));  // set el0's sp to top of new stack
-    asm volatile("eret;");                                 // switch EL to 0
+    asm volatile("msr tpidr_el1, %0;" ::"r"(&t->context));                // hold the "kernel(el1)" thread structure info
+    asm volatile("msr elr_el1, %0;" ::"r"(t->context.lr));                // set exception return addr to 'c_filedata'
+    asm volatile("msr spsr_el1, %0;" ::"r"(0x0));                         // set state to user mode, and enable interrupt
+    asm volatile("msr sp_el0, %0;" ::"r"(t->context.sp));                 // set el0's sp to top of new stack
+    asm volatile("mov sp, %0;" ::"r"(t->kernel_stack_ptr + KSTACK_SIZE)); // set el0's sp to top of new stack
+    add_timer(schedule_timer, "", getTimerFreq());
+    asm volatile("eret;"); // switch EL to 0
 }
 
+// TODO: why there is a no use param??
 void schedule_timer() {
     add_timer(schedule_timer, "re-schedule", getTimerFreq());
     // add_timer(schedule_timer, "re-schedule", getTimerFreq() >> 5);
@@ -144,7 +158,7 @@ void schedule_timer() {
 void foo() {
     for (int i = 0; i < 10; ++i) {
         uart_sendline("Thread id: %d %d\n", cur_thread->pid, i);
-        for (int j = 0; j < 50000000; j++)
+        for (int j = 0; j < 1000000; j++)
             asm volatile("nop\n\t");
         schedule();
     }

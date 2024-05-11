@@ -395,7 +395,7 @@ void do_cmd_thread_test() {
     for (int i = 0; i < 5; i++) {
         uart_sendline("testing: %d\n", thread_create(foo)->pid);
     }
-    schedule_timer();
+    schedule_timer("");
     // idle();
 }
 
@@ -468,10 +468,10 @@ void fork_test() {
     from_el1_to_el0(cur_thread);
 
     // uart I/O test
-    char buf[128];
-    uart_sendline("Input : ");
-    test_uart_read(buf, 5);
-    test_uart_write(buf, sizeof(buf));
+    // char buf[128];
+    // uart_sendline("Input : ");
+    // test_uart_read(buf, 5);
+    // test_uart_write(buf, sizeof(buf));
 
     // mailbox test
 

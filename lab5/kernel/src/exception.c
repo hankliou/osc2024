@@ -2,6 +2,7 @@
 #include "bcm2837/rpi_irq.h"
 #include "bcm2837/rpi_uart1.h"
 #include "memory.h"
+#include "signal.h"
 #include "syscall.h"
 #include "thread.h"
 #include "timer.h"
@@ -31,6 +32,7 @@ void el0_sync_router(trap_frame *tpf) {
     el1_interrupt_enable();
     int syscall_no = tpf->x8;
     // uart_sendline("syscall: %d\n", syscall_no);
+    // uart_sendline("tpf: %x\n", tpf);
     switch (syscall_no) {
     case 0:
         getpid(tpf);
@@ -57,16 +59,21 @@ void el0_sync_router(trap_frame *tpf) {
     case 7:
         kill(tpf, tpf->x0);
         break;
+    // case 8:
+    //     kill(tpf, tpf->x0);
+    //     break;
+    // case 9:
+    //     kill(tpf, tpf->x0);
+    //     break;
     default:
         uart_sendline("Invalid System Call Number\n");
     }
     // uart_sendline("syscall end\n");
 }
 
-void el1h_irq_router() {
+void el1h_irq_router(trap_frame *tpf) {
     // uart
     if (*IRQ_PENDING_1 & (1 << 29)) {
-        uart_sendline("uart INT\n");
         switch (*AUX_MU_IIR_REG & 0x6) {
         case 0x2: // transmit interrupt
             uart_tx_irq_disable();
@@ -80,7 +87,6 @@ void el1h_irq_router() {
     }
     // timer
     else if (*CORE0_INTERRUPT_SOURCE & 0x2) {
-        uart_sendline("timer INT\n");
         timer_disable_interrupt();
         add_irq_task(timer_handler, TIMER_IRQ_PRIORITY);
         timer_enable_interrupt();
@@ -88,13 +94,20 @@ void el1h_irq_router() {
         if (run_queue->next->next != run_queue)
             schedule();
     }
+
+    // TODO
+    // M[3:0], 0: User, 1:FIQ, 2:IRQ, 3:Supervisor
+    // if ((tpf->spsr_el1 & 0b1100) == 0) {
+    //     check_signal(tpf);
+    // }
 }
 
 void invalid_exception_router(int no) {
     uart_sendline("invalid exception [%d]\n", no);
-    unsigned long esr;
+    unsigned long esr, elr;
     asm volatile("mrs %0, esr_el1" : "=r"(esr));
-    uart_sendline("esr_el1: %x\n", esr);
+    asm volatile("mrs %0, elr_el1" : "=r"(elr));
+    uart_sendline("esr_el1: %x, elr_el1: %x\n", esr, elr);
     while (1) {};
 }
 

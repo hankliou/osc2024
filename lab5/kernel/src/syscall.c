@@ -69,8 +69,19 @@ int fork(trap_frame *tpf) {
     memcpy(child->user_stack_ptr, parent->user_stack_ptr, USTACK_SIZE);     // copy user stack (deep copy)
     memcpy(child->kernel_stack_ptr, parent->kernel_stack_ptr, KSTACK_SIZE); // copy kernel stack (deep copy)
 
+    uart_sendline("parent ker: %x, child ker: %x, parent sp: %x, child sp: %x\n", parent->kernel_stack_ptr, child->kernel_stack_ptr,
+                  parent->context.sp, child->context.sp);
+    unsigned long long sp;
+    asm volatile("mov %0, sp" : "=r"(sp));
+    uart_sendline("sp: %x\n", sp);
+
     // before coping context, update parent's context first!!!
     store_context(get_current()); // mainly storing lr and sp
+
+    uart_sendline("parent ker: %x, child ker: %x, parent sp: %x, child sp: %x\n", parent->kernel_stack_ptr, child->kernel_stack_ptr,
+                  parent->context.sp, child->context.sp);
+    asm volatile("mov %0, sp" : "=r"(sp));
+    uart_sendline("sp: %x\n", sp);
 
     // child
     if (cur_thread->pid != parent_id) {
@@ -126,6 +137,9 @@ void kill(trap_frame *tpf, int pid) {
     thread_list[pid].iszombie = 1;
     unlock();
     schedule();
+}
+
+void signal_kill() {
 }
 
 unsigned int get_file_size(char *path) {

@@ -128,12 +128,14 @@ el1h_sync:
     bl invalid_exception_router
     // load_state
     // eret
-el1h_irq:
+
+el1h_irq: // timer & uart
     save_state
     mov x0, sp
     bl el1h_irq_router
     load_state
     eret
+
 el1h_fiq_invalid:
     // save_state
     mov x0,6
@@ -154,13 +156,12 @@ el0_sync_64: // SVC
     load_state
     eret
 
-el0_irq_64:
-    // save_state
-    mov x0, 9
-    // bl el0_irq_64_router
-    bl invalid_exception_router
-    // load_state
-    // eret
+el0_irq_64: // timer & uart
+    save_state
+    mov x0, sp
+    bl el1h_irq_router
+    load_state
+    eret
 el0_fiq_invalid_64:
     // save_state
     mov x0,10

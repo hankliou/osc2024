@@ -2,8 +2,9 @@
 #define _THREAD_H_
 
 #define MAXPID 32678 // Linux kernel defined limit 2^15
-#define USTACK_SIZE 0x10000
-#define KSTACK_SIZE 0x10000
+#define USTACK_SIZE 0x1000
+#define KSTACK_SIZE 0x1000
+#define SIGNAL_MAX 64
 
 extern void *switch_to(void *curr_context, void *next_context);
 extern void *get_current();
@@ -32,14 +33,20 @@ typedef struct thread_context {
 typedef struct thread {
     struct thread *next;
     struct thread *prev;
+    int pid;                // process id
     char *code;             // something static like .text .data blablabla
     unsigned int codesize;  // size of static data (code)
-    int iszombie;           // zombie flag
-    int pid;                // process id
     int isused;             // flag, check if thread is in used
+    int iszombie;           // zombie flag
     char *user_stack_ptr;   // stack segment
     char *kernel_stack_ptr; // store register when enter kernel mode
     thread_context context; // context(registers) need to store
+
+    int sigcount[SIGNAL_MAX + 1];             // Signal Pending buffer
+    void (*signal_handler[SIGNAL_MAX + 1])(); // Signal handlers for different signal
+    void (*curr_signal_handler)();            // Allow Signal handler overwritten by others
+    int signal_inProcess;                     // Signal Processing Lock (flag)
+    thread_context signal_savedContext;       // Store registers before signal handler involving
 } thread;
 
 void init_thread();
