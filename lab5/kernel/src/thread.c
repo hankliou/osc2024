@@ -7,7 +7,7 @@
 #include "uart1.h"
 
 thread *run_queue;
-thread thread_list[MAXPID + 1];
+thread thread_list[PID_MAX + 1];
 thread *cur_thread;
 
 int pid_cnt = 0;
@@ -20,7 +20,7 @@ void init_thread() {
     run_queue->prev = run_queue;
     run_queue->pid = -1; // debug usage
 
-    for (int i = 0; i <= MAXPID; i++) {
+    for (int i = 0; i <= PID_MAX; i++) {
         thread_list[i].isused = 0;
         thread_list[i].iszombie = 0;
         thread_list[i].pid = i;
@@ -35,7 +35,7 @@ void init_thread() {
 thread *thread_create(void *funcion_start_point) {
     lock();
     thread *the_thread;
-    if (pid_cnt > MAXPID)
+    if (pid_cnt > PID_MAX)
         return 0;
 
     // check the pid in thread_list, if not use yet, take it
@@ -59,7 +59,7 @@ thread *thread_create(void *funcion_start_point) {
 
     // signal
     the_thread->signal_inProcess = 0;
-    for (int i = 0; i < SIGNAL_MAX; i++) {
+    for (int i = 0; i <= SIGNAL_MAX; i++) {
         the_thread->sigcount[i] = 0;
         the_thread->signal_handler[i] = signal_default_handler;
     }
@@ -131,7 +131,6 @@ void kill_zombie() {
 
 // for video player
 void thread_exec(char *code, unsigned int codesize) {
-    // TODO
     thread *t = thread_create(code);
     t->codesize = codesize;
     t->code = kmalloc(codesize);
@@ -143,16 +142,15 @@ void thread_exec(char *code, unsigned int codesize) {
     asm volatile("msr tpidr_el1, %0;" ::"r"(&t->context));                // hold the "kernel(el1)" thread structure info
     asm volatile("msr elr_el1, %0;" ::"r"(t->context.lr));                // set exception return addr to 'c_filedata'
     asm volatile("msr spsr_el1, %0;" ::"r"(0x0));                         // set state to user mode, and enable interrupt
-    asm volatile("msr sp_el0, %0;" ::"r"(t->context.sp));                 // set el0's sp to top of new stack
+    asm volatile("msr sp_el0, %0;" ::"r"(t->context.sp));                 //
     asm volatile("mov sp, %0;" ::"r"(t->kernel_stack_ptr + KSTACK_SIZE)); // set el0's sp to top of new stack
     add_timer(schedule_timer, "", getTimerFreq());
     asm volatile("eret;"); // switch EL to 0
 }
 
-// TODO: why there is a no use param??
 void schedule_timer() {
-    add_timer(schedule_timer, "re-schedule", getTimerFreq());
-    // add_timer(schedule_timer, "re-schedule", getTimerFreq() >> 5);
+    // add_timer(schedule_timer, "re-schedule", getTimerFreq());
+    add_timer(schedule_timer, "re-schedule", getTimerFreq() >> 5);
 }
 
 void foo() {

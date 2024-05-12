@@ -400,7 +400,6 @@ void do_cmd_thread_test() {
 }
 
 void do_cmd_syscall_test() {
-    // TODO: switch to el0
     thread_create(fork_test);
     schedule();
 }

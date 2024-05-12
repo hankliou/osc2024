@@ -11,12 +11,16 @@
 irq_node *irq_head; // head is empty, every node come after head
 extern thread *run_queue;
 
+static unsigned long long lock_count = 0;
 void lock() {
-    el1_interrupt_disable();
+    el1_interrupt_disable(); // enter critical section
+    lock_count++;
 }
 
 void unlock() {
-    el1_interrupt_enable();
+    lock_count--;
+    if (lock_count <= 0)
+        el1_interrupt_enable(); // leave critical section
 }
 
 void el0_sync_router(trap_frame *tpf) {
@@ -59,12 +63,15 @@ void el0_sync_router(trap_frame *tpf) {
     case 7:
         kill(tpf, tpf->x0);
         break;
-    // case 8:
-    //     kill(tpf, tpf->x0);
-    //     break;
-    // case 9:
-    //     kill(tpf, tpf->x0);
-    //     break;
+    case 8:
+        signal_register(tpf->x0, (void (*)())(tpf->x1));
+        break;
+    case 9:
+        signal_kill(tpf->x0, tpf->x1);
+        break;
+    case 99:
+        signal_return(tpf);
+        break;
     default:
         uart_sendline("Invalid System Call Number\n");
     }
@@ -97,9 +104,9 @@ void el1h_irq_router(trap_frame *tpf) {
 
     // TODO
     // M[3:0], 0: User, 1:FIQ, 2:IRQ, 3:Supervisor
-    // if ((tpf->spsr_el1 & 0b1100) == 0) {
-    //     check_signal(tpf);
-    // }
+    if ((tpf->spsr_el1 & 0b1100) == 0) {
+        check_signal(tpf);
+    }
 }
 
 void invalid_exception_router(int no) {

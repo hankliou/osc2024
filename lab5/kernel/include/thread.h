@@ -1,14 +1,15 @@
 #ifndef _THREAD_H_
 #define _THREAD_H_
 
-#define MAXPID 32678 // Linux kernel defined limit 2^15
+#define PID_MAX 32678 // Linux kernel defined limit 2^15
 #define USTACK_SIZE 0x1000
 #define KSTACK_SIZE 0x1000
 #define SIGNAL_MAX 64
 
 extern void *switch_to(void *curr_context, void *next_context);
-extern void *get_current();
-extern void *store_context(void *cur_context);
+extern int *get_current();
+extern void *store_context(void *addr);
+extern void *load_context(void *addr);
 
 typedef struct thread_context {
     // callee saved registers

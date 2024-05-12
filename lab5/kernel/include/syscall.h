@@ -51,6 +51,10 @@ void exit(trap_frame *tpf, int status);
 int mbox_call(trap_frame *tpf, unsigned char ch, unsigned int *mbox);
 void kill(trap_frame *tpf, int pid);
 
+void signal_register(int signal, void (*handler)());
+void signal_kill(int pid, int signal);
+void signal_return(trap_frame *tpf);
+
 // components
 unsigned int get_file_size(char *path);
 char *get_file_start(char *path);

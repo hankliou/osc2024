@@ -1,6 +1,8 @@
 // arm32 pass args by x0 ~ x3, if more than 4 args, pass by stack
+// arm64 pass args by x0 ~ x7, if more than 8 args, pass by stack
+
 .global switch_to
-switch_to: // called with 2 param, (prev, next) = (x0, x1), return int
+switch_to: // called with 2 param, (prev, next) = (x0, x1)
     stp x19, x20, [x0, 16 * 0]
     stp x21, x22, [x0, 16 * 1]
     stp x23, x24, [x0, 16 * 2]
@@ -22,13 +24,13 @@ switch_to: // called with 2 param, (prev, next) = (x0, x1), return int
     ret
 
 // x0: return value
-.global get_current  // called with no param, return int
+.global get_current  // int get_current();
 get_current:
     mrs x0, tpidr_el1
     ret
 
 .global store_context
-store_context: // void store_context (unsigned long* addr_to_store);
+store_context: // void store_context(void* addr_to_store);
     stp x19, x20, [x0, 16 * 0]
     stp x21, x22, [x0, 16 * 1]
     stp x23, x24, [x0, 16 * 2]
@@ -39,5 +41,14 @@ store_context: // void store_context (unsigned long* addr_to_store);
     str x9, [x0, 16 * 6]
     ret
 
-hang:
-    b hang
+.global load_context
+load_context: // void load_context (void* addr_to_load);
+    ldp x19, x20, [x0, 16 * 0]
+    ldp x21, x22, [x0, 16 * 1]
+    ldp x23, x24, [x0, 16 * 2]
+    ldp x25, x26, [x0, 16 * 3]
+    ldp x27, x28, [x0, 16 * 4]
+    ldp fp, lr, [x0, 16 * 5]
+    ldr x9, [x0, 16 * 6]
+    mov sp,  x9
+    ret

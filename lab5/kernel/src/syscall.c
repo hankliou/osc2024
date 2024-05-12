@@ -3,13 +3,15 @@
 #include "cpio.h"
 #include "exception.h"
 #include "mbox.h"
+#include "memory.h"
+#include "signal.h"
 #include "thread.h"
 #include "u_string.h"
 #include "uart1.h"
 
 extern thread *cur_thread;
 extern thread *run_queue;
-extern thread thread_list[MAXPID + 1];
+extern thread thread_list[PID_MAX + 1];
 
 extern void *CPIO_DEFAULT_START;
 
@@ -52,6 +54,11 @@ size_t uart_write(trap_frame *tpf, const char buf[], size_t size) {
 int exec(trap_frame *tpf, const char *name, char *const argv[]) {
     cur_thread->codesize = get_file_size((char *)name);
     memcpy(cur_thread->code, get_file_start((char *)name), cur_thread->codesize);
+
+    // init signal handler
+    for (int i = 0; i <= SIGNAL_MAX; i++)
+        cur_thread->signal_handler[i] = signal_default_handler;
+
     tpf->elr_el1 = (unsigned long)cur_thread->code;
     tpf->sp_el0 = (unsigned long)cur_thread->user_stack_ptr + USTACK_SIZE;
     tpf->x0 = 0;
@@ -69,19 +76,12 @@ int fork(trap_frame *tpf) {
     memcpy(child->user_stack_ptr, parent->user_stack_ptr, USTACK_SIZE);     // copy user stack (deep copy)
     memcpy(child->kernel_stack_ptr, parent->kernel_stack_ptr, KSTACK_SIZE); // copy kernel stack (deep copy)
 
-    uart_sendline("parent ker: %x, child ker: %x, parent sp: %x, child sp: %x\n", parent->kernel_stack_ptr, child->kernel_stack_ptr,
-                  parent->context.sp, child->context.sp);
-    unsigned long long sp;
-    asm volatile("mov %0, sp" : "=r"(sp));
-    uart_sendline("sp: %x\n", sp);
+    // copy signal handler
+    for (int i = 0; i <= SIGNAL_MAX; i++)
+        child->signal_handler[i] = parent->signal_handler[i];
 
     // before coping context, update parent's context first!!!
     store_context(get_current()); // mainly storing lr and sp
-
-    uart_sendline("parent ker: %x, child ker: %x, parent sp: %x, child sp: %x\n", parent->kernel_stack_ptr, child->kernel_stack_ptr,
-                  parent->context.sp, child->context.sp);
-    asm volatile("mov %0, sp" : "=r"(sp));
-    uart_sendline("sp: %x\n", sp);
 
     // child
     if (cur_thread->pid != parent_id) {
@@ -112,26 +112,28 @@ void exit(trap_frame *tpf, int status) {
 
 int mbox_call(trap_frame *tpf, unsigned char ch, unsigned int *mbox) {
     lock();
-
-    unsigned int r = (*mbox & ~(0xF)) | (*mbox | ch);
-    while ((*MBOX_STATUS & BCM_ARM_VC_MS_FULL) != 0) {}
-    *MBOX_WRITE = r;
-
-    while (1) {
-        while (*MBOX_STATUS & BCM_ARM_VC_MS_EMPTY) {}
-        if (*MBOX_READ == r) {
-            tpf->x0 = (mbox[1] == MBOX_REQUEST_SUCCEED);
-            unlock();
-            return tpf->x0;
-        }
-    }
-    tpf->x0 = 0;
+    // unsigned long r = (((unsigned long)((unsigned long)mbox) & ~0xF) | (ch & 0xF));
+    // do {
+    //     asm volatile("nop");
+    // } while (*MBOX_STATUS & BCM_ARM_VC_MS_FULL);
+    // *MBOX_WRITE = r;
+    // while (1) {
+    //     do {
+    //         asm volatile("nop");
+    //     } while (*MBOX_STATUS & BCM_ARM_VC_MS_EMPTY);
+    //     if (r == *MBOX_READ) {
+    //         tpf->x0 = (mbox[1] == MBOX_REQUEST_SUCCEED);
+    //         unlock();
+    //         return mbox[1] == MBOX_REQUEST_SUCCEED;
+    //     }
+    // }
+    // tpf->x0 = 0;
     unlock();
     return 0;
 }
 
 void kill(trap_frame *tpf, int pid) {
-    if (pid < 0 || pid > MAXPID || !thread_list[pid].isused)
+    if (pid < 0 || pid > PID_MAX || !thread_list[pid].isused)
         return;
     lock();
     thread_list[pid].iszombie = 1;
@@ -139,9 +141,31 @@ void kill(trap_frame *tpf, int pid) {
     schedule();
 }
 
-void signal_kill() {
+/* signal related functions */
+void signal_register(int signal, void (*handler)()) {
+    if (signal < 0 || signal > SIGNAL_MAX)
+        return;
+    cur_thread->signal_handler[signal] = handler;
 }
 
+void signal_kill(int pid, int signal) {
+    if (pid < 0 || pid > PID_MAX || !thread_list[pid].isused)
+        return;
+    lock();
+    thread_list[pid].iszombie = 1;
+    unlock();
+}
+
+void signal_return(trap_frame *tpf) {
+    // free space (there may be some sys call in user-defined handler, when handling, tpf will be update, hance we can get it's sp from tpf)
+    unsigned long long signal_user_stack = tpf->sp_el0 % USTACK_SIZE == 0 ? tpf->sp_el0 - USTACK_SIZE : tpf->sp_el0 & (~(USTACK_SIZE - 1));
+    kfree((char *)signal_user_stack);
+
+    // load context
+    load_context(&cur_thread->signal_savedContext);
+}
+
+/* components */
 unsigned int get_file_size(char *path) {
     char *filepath, *filedata;
     unsigned int filesize;
