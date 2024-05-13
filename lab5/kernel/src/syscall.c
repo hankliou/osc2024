@@ -110,29 +110,29 @@ void exit(trap_frame *tpf, int status) {
     thread_exit();
 }
 
-int mbox_call(trap_frame *tpf, unsigned char ch, unsigned int *mbox) {
-    lock();
-    // unsigned long r = (((unsigned long)((unsigned long)mbox) & ~0xF) | (ch & 0xF));
-    // uart_sendline("mbox: %x, ch: %x, r: %x\n", mbox, ch, r);
-    // do {
-    //     asm volatile("nop");
-    // } while (*MBOX_STATUS & BCM_ARM_VC_MS_FULL);
-    // *MBOX_WRITE = r;
-    // while (1) {
-    //     do {
-    //         asm volatile("nop");
-    //     } while (*MBOX_STATUS & BCM_ARM_VC_MS_EMPTY);
-    //     if (r == *MBOX_READ) {
-    //         tpf->x0 = (mbox[1] == MBOX_REQUEST_SUCCEED);
-    //         unlock();
-    //         return mbox[1] == MBOX_REQUEST_SUCCEED;
-    //     }
-    // }
-    // tpf->x0 = 0;
-    tpf->x0 = k_mbox_call(ch, (unsigned int)((unsigned long)mbox));
-    return tpf->x0;
+// int mbox_call(trap_frame *tpf, unsigned char ch, unsigned int *mbox) {
+//     lock();
+//     tpf->x0 = k_mbox_call(ch, (unsigned int)((unsigned long)mbox));
+//     unlock();
+//     return tpf->x0;
+// }
 
-    unlock();
+int mbox_call(trap_frame *tpf, unsigned char ch, unsigned int *mbox) {
+    unsigned int r = ((unsigned long)mbox & ~0xF) | (ch & 0xF);
+    // Wait until we can write to the mailbox
+    while (*MBOX_STATUS & BCM_ARM_VC_MS_FULL)
+        ;
+    *MBOX_WRITE = r; // Write the request
+    while (1) {
+        // Wait for the response
+        while (*MBOX_STATUS & BCM_ARM_VC_MS_EMPTY)
+            ;
+        if (r == *MBOX_READ) {
+            tpf->x0 = (mbox[1] == MBOX_REQUEST_SUCCEED);
+            return mbox[1] == MBOX_REQUEST_SUCCEED;
+        }
+    }
+    tpf->x0 = 0;
     return 0;
 }
 
