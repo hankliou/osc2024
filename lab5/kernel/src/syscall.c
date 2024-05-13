@@ -113,6 +113,7 @@ void exit(trap_frame *tpf, int status) {
 int mbox_call(trap_frame *tpf, unsigned char ch, unsigned int *mbox) {
     lock();
     // unsigned long r = (((unsigned long)((unsigned long)mbox) & ~0xF) | (ch & 0xF));
+    // uart_sendline("mbox: %x, ch: %x, r: %x\n", mbox, ch, r);
     // do {
     //     asm volatile("nop");
     // } while (*MBOX_STATUS & BCM_ARM_VC_MS_FULL);
@@ -128,6 +129,9 @@ int mbox_call(trap_frame *tpf, unsigned char ch, unsigned int *mbox) {
     //     }
     // }
     // tpf->x0 = 0;
+    tpf->x0 = k_mbox_call(ch, (unsigned int)((unsigned long)mbox));
+    return tpf->x0;
+
     unlock();
     return 0;
 }
