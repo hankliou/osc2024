@@ -467,12 +467,10 @@ void fork_test() {
     from_el1_to_el0(cur_thread);
 
     // uart I/O test
-    // char buf[128];
-    // uart_sendline("Input : ");
-    // test_uart_read(buf, 5);
-    // test_uart_write(buf, sizeof(buf));
-
-    // mailbox test
+    char buf[128];
+    uart_sendline("Input : ");
+    test_uart_read(buf, 5);
+    test_uart_write(buf, sizeof(buf));
 
     // fork test
     uart_sendline("\nFork Test, pid %d\n", test_getpid());

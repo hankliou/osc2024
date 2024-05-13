@@ -118,6 +118,7 @@ void exit(trap_frame *tpf, int status) {
 // }
 
 int mbox_call(trap_frame *tpf, unsigned char ch, unsigned int *mbox) {
+    lock();
     unsigned int r = ((unsigned long)mbox & ~0xF) | (ch & 0xF);
     // Wait until we can write to the mailbox
     while (*MBOX_STATUS & BCM_ARM_VC_MS_FULL)
@@ -129,10 +130,12 @@ int mbox_call(trap_frame *tpf, unsigned char ch, unsigned int *mbox) {
             ;
         if (r == *MBOX_READ) {
             tpf->x0 = (mbox[1] == MBOX_REQUEST_SUCCEED);
+            unlock();
             return mbox[1] == MBOX_REQUEST_SUCCEED;
         }
     }
     tpf->x0 = 0;
+    unlock();
     return 0;
 }
 
