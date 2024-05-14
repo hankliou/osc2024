@@ -35,7 +35,7 @@ int getpid(trap_frame *tpf) {
 size_t uart_read(trap_frame *tpf, char buf[], size_t size) {
     int i = 0;
     while (i < size)
-        buf[i++] = uart_async_getc();
+        buf[i++] = uart_getc();
     tpf->x0 = i;
     return i;
 }
@@ -44,7 +44,7 @@ size_t uart_read(trap_frame *tpf, char buf[], size_t size) {
 size_t uart_write(trap_frame *tpf, const char buf[], size_t size) {
     int i = 0;
     while (i < size)
-        uart_async_putc(buf[i++]);
+        uart_send(buf[i++]);
     tpf->x0 = i;
     return i;
 }
@@ -90,7 +90,6 @@ int fork(trap_frame *tpf) {
         // child move it's "user sp" with same offset of it's parent
         tpf->sp_el0 += child->user_stack_ptr - parent->user_stack_ptr;
         tpf->x0 = 0;
-        unlock();
         return 0; // jump to link register
     }
 
