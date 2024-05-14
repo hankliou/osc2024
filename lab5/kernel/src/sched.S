@@ -20,7 +20,7 @@ switch_to: // called with 2 param, (prev, next) = (x0, x1)
     ldp fp, lr, [x1, 16 * 5]
     ldr x9, [x1, 16 * 6]
     mov sp,  x9
-    msr tpidr_el1, x1 // tpidr_el1 stores starting address of thread's context
+    msr tpidr_el1, x1 // tpidr_el1 stores starting address of thread's structure
     ret
 
 // x0: return value

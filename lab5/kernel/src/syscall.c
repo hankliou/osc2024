@@ -9,7 +9,6 @@
 #include "u_string.h"
 #include "uart1.h"
 
-extern thread *cur_thread;
 extern thread *run_queue;
 extern thread thread_list[PID_MAX + 1];
 
@@ -28,8 +27,8 @@ extern void *CPIO_DEFAULT_START;
     !!!!!!!!!!!!!!!!
 */
 int getpid(trap_frame *tpf) {
-    tpf->x0 = cur_thread->pid;
-    return cur_thread->pid;
+    tpf->x0 = get_current()->pid;
+    return get_current()->pid;
 }
 
 // user have to allocate spaces to x0(buf) themself
@@ -52,6 +51,7 @@ size_t uart_write(trap_frame *tpf, const char buf[], size_t size) {
 
 // Note: In this lab, you won’t have to deal with argument passing, but you can still use it.
 int exec(trap_frame *tpf, const char *name, char *const argv[]) {
+    thread *cur_thread = get_current();
     cur_thread->codesize = get_file_size((char *)name);
     memcpy(cur_thread->code, get_file_start((char *)name), cur_thread->codesize);
 
@@ -69,10 +69,10 @@ int exec(trap_frame *tpf, const char *name, char *const argv[]) {
 int fork(trap_frame *tpf) {
     lock();
 
-    thread *child = thread_create(cur_thread->code);                        // create new thread
-    thread *parent = cur_thread;                                            // backup parent thread
-    int parent_id = cur_thread->pid;                                        // record original pid
-    child->codesize = cur_thread->codesize;                                 // assign size
+    thread *child = thread_create(get_current()->code);                     // create new thread
+    thread *parent = get_current();                                         // backup parent thread
+    int parent_id = parent->pid;                                            // record original pid
+    child->codesize = parent->codesize;                                     // assign size
     memcpy(child->user_stack_ptr, parent->user_stack_ptr, USTACK_SIZE);     // copy user stack (deep copy)
     memcpy(child->kernel_stack_ptr, parent->kernel_stack_ptr, KSTACK_SIZE); // copy kernel stack (deep copy)
 
@@ -81,10 +81,10 @@ int fork(trap_frame *tpf) {
         child->signal_handler[i] = parent->signal_handler[i];
 
     // before coping context, update parent's context first!!!
-    store_context(get_current()); // mainly storing lr and sp
+    store_context((thread_context *)get_current()); // mainly storing lr and sp
 
     // child
-    if (cur_thread->pid != parent_id) {
+    if (get_current()->pid != parent_id) {
         // child move it's "tpf" pointer to it's trap_frame
         tpf = (trap_frame *)((char *)tpf + (child->kernel_stack_ptr - parent->kernel_stack_ptr)); // trap frame in kernel stack
         // child move it's "user sp" with same offset of it's parent
@@ -95,7 +95,7 @@ int fork(trap_frame *tpf) {
     }
 
     // copy parent's context to child
-    child->context = cur_thread->context;
+    child->context = get_current()->context;
     // update an offset to child's sp, so after jump with "lr", "sp" will be correct
     unsigned long long offset = (unsigned long long)(child->kernel_stack_ptr) - (unsigned long long)(parent->kernel_stack_ptr);
     child->context.fp += offset;
@@ -152,7 +152,7 @@ void kill(trap_frame *tpf, int pid) {
 void signal_register(int signal, void (*handler)()) {
     if (signal < 0 || signal > SIGNAL_MAX)
         return;
-    cur_thread->signal_handler[signal] = handler;
+    get_current()->signal_handler[signal] = handler;
 }
 
 void signal_kill(int pid, int signal) {
@@ -169,7 +169,7 @@ void signal_return(trap_frame *tpf) {
     kfree((char *)signal_user_stack);
 
     // load context
-    load_context(&cur_thread->signal_savedContext);
+    load_context(&get_current()->signal_savedContext);
 }
 
 /* components */

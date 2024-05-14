@@ -13,7 +13,6 @@
 
 extern char *dtb_ptr;
 extern int uart_recv_echo_flag;
-extern thread *cur_thread;
 
 void *CPIO_DEFAULT_START; // root of ramfs
 void *CPIO_DEFAULT_END;   // end addressl of ramfs
@@ -464,7 +463,7 @@ void test_kill(int pid) {
 // run in user space
 void fork_test() {
     // switch to user space
-    from_el1_to_el0(cur_thread);
+    from_el1_to_el0(get_current());
 
     // uart I/O test
     char buf[128];

@@ -4,41 +4,40 @@
 #include "syscall.h"
 #include "thread.h"
 
-extern thread *cur_thread;
-extern void *store_context(void *cur_context);
+extern void store_context(thread_context *addr);
 
 void signal_default_handler() {
-    kill(0, cur_thread->pid);
+    kill(0, get_current()->pid);
 }
 
 void check_signal(trap_frame *tpf) {
     // no need to handle nested signal handling
-    if (cur_thread->signal_inProcess)
+    if (get_current()->signal_inProcess)
         return;
     lock();
-    cur_thread->signal_inProcess = 1;
+    get_current()->signal_inProcess = 1;
     unlock();
 
     for (int i = 0; i <= SIGNAL_MAX; i++) {
-        store_context(&cur_thread->signal_savedContext);
-        if (cur_thread->sigcount[i] > 0) {
+        store_context(&get_current()->signal_savedContext);
+        if (get_current()->sigcount[i] > 0) {
             lock();
-            cur_thread->sigcount[i]--;
+            get_current()->sigcount[i]--;
             unlock();
             run_signal(tpf, i);
         }
     }
 
     lock();
-    cur_thread->signal_inProcess = 0;
+    get_current()->signal_inProcess = 0;
     unlock();
 }
 
 void run_signal(trap_frame *tpf, int idx) {
-    cur_thread->curr_signal_handler = cur_thread->signal_handler[idx];
+    get_current()->curr_signal_handler = get_current()->signal_handler[idx];
 
     // run default handler in kernel mode
-    if (cur_thread->curr_signal_handler == signal_default_handler) {
+    if (get_current()->curr_signal_handler == signal_default_handler) {
         signal_default_handler();
         return;
     }
@@ -52,7 +51,7 @@ void run_signal(trap_frame *tpf, int idx) {
 }
 
 void signal_handler_wrapper() {
-    (cur_thread->curr_signal_handler)();
+    (get_current()->curr_signal_handler)();
     // [signal_return] system call
     asm volatile("mov x8, 99");
     asm volatile("svc 0");

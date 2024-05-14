@@ -8,7 +8,6 @@
 
 thread *run_queue;
 thread thread_list[PID_MAX + 1];
-thread *cur_thread;
 
 int pid_cnt = 0;
 
@@ -26,8 +25,8 @@ void init_thread() {
         thread_list[i].pid = i;
     }
     // BUG: Don't let thread structure NULL as we enable the functionality
-    cur_thread = thread_create(idle);
-    asm volatile("msr tpidr_el1, %0" ::"r"(&cur_thread->context));
+    thread *cur_thread = thread_create(idle);
+    asm volatile("msr tpidr_el1, %0" ::"r"(cur_thread));
 
     unlock();
 }
@@ -87,6 +86,7 @@ void from_el1_to_el0(thread *t) {
 void schedule() {
     lock();
 
+    thread *cur_thread = get_current();
     do {
         cur_thread = cur_thread->next;
     } while (cur_thread == run_queue);
@@ -94,10 +94,11 @@ void schedule() {
 
     // context switch (defined in asm)
     // pass both thread's addr as base addr, to load/store the registers
-    switch_to(get_current(), &cur_thread->context);
+    switch_to(get_current(), cur_thread);
 }
 
 void idle() {
+    uart_sendline("idle\n");
     while (1) {
         kill_zombie();
         schedule();
@@ -106,7 +107,7 @@ void idle() {
 
 void thread_exit() {
     lock();
-    cur_thread->iszombie = 1;
+    get_current()->iszombie = 1;
     unlock();
     schedule();
 }
@@ -136,7 +137,6 @@ void thread_exec(char *code, unsigned int codesize) {
     t->code = kmalloc(codesize);
     memcpy(t->code, code, codesize);
     t->context.lr = (unsigned long)t->code;
-    cur_thread = t;
     asm volatile("msr tpidr_el1, %0;" ::"r"(&t->context));                // hold the "kernel(el1)" thread structure info
     asm volatile("msr elr_el1, %0;" ::"r"(t->context.lr));                // set exception return addr to 'c_filedata'
     asm volatile("msr spsr_el1, %0;" ::"r"(0x0));                         // set state to user mode, and enable interrupt
@@ -153,8 +153,8 @@ void schedule_timer() {
 
 void foo() {
     for (int i = 0; i < 10; ++i) {
-        uart_sendline("Thread id: %d %d\n", cur_thread->pid, i);
-        for (int j = 0; j < 1000000; j++)
+        uart_sendline("Thread id: %d %d\n", get_current()->pid, i);
+        for (int j = 0; j < 10000000; j++)
             asm volatile("nop\n\t");
         schedule();
     }
