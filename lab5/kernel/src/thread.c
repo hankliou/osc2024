@@ -98,7 +98,6 @@ void schedule() {
 }
 
 void idle() {
-    uart_sendline("idle\n");
     while (1) {
         kill_zombie();
         schedule();

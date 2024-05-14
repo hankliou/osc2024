@@ -394,13 +394,13 @@ void do_cmd_thread_test() {
     for (int i = 0; i < 5; i++) {
         uart_sendline("testing: %d\n", thread_create(foo)->pid);
     }
-    schedule_timer("");
-    // idle();
+    // schedule_timer("");
+    idle();
 }
 
 void do_cmd_syscall_test() {
     thread_create(fork_test);
-    schedule();
+    idle();
 }
 
 int test_getpid() {
