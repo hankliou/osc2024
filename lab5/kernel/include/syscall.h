@@ -49,7 +49,7 @@ int exec(trap_frame *tpf, const char *name, char *const argv[]);
 int fork(trap_frame *tpf);
 void exit(trap_frame *tpf, int status);
 int mbox_call(trap_frame *tpf, unsigned char ch, unsigned int *mbox);
-void kill(trap_frame *tpf, int pid);
+void kill(int pid);
 
 void signal_register(int signal, void (*handler)());
 void signal_kill(int pid, int signal);

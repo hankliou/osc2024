@@ -24,7 +24,6 @@ void init_thread() {
         thread_list[i].iszombie = 0;
         thread_list[i].pid = i;
     }
-    // BUG: Don't let thread structure NULL as we enable the functionality
     thread *cur_thread = thread_create(idle);
     asm volatile("msr tpidr_el1, %0" ::"r"(cur_thread));
 

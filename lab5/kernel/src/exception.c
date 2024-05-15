@@ -36,7 +36,6 @@ void el0_sync_router(trap_frame *tpf) {
     el1_interrupt_enable();
     int syscall_no = tpf->x8;
     // uart_sendline("syscall: %d\n", syscall_no);
-    // uart_sendline("tpf: %x\n", tpf);
     switch (syscall_no) {
     case 0:
         getpid(tpf);
@@ -61,7 +60,7 @@ void el0_sync_router(trap_frame *tpf) {
         mbox_call(tpf, (unsigned char)tpf->x0, (unsigned int *)tpf->x1);
         break;
     case 7:
-        kill(tpf, tpf->x0);
+        kill(tpf->x0);
         break;
     case 8:
         signal_register(tpf->x0, (void (*)())(tpf->x1));
@@ -75,7 +74,6 @@ void el0_sync_router(trap_frame *tpf) {
     default:
         uart_sendline("Invalid System Call Number\n");
     }
-    // uart_sendline("syscall end\n");
 }
 
 void el1h_irq_router(trap_frame *tpf) {
@@ -102,11 +100,21 @@ void el1h_irq_router(trap_frame *tpf) {
             schedule();
     }
 
-    // TODO
-    // M[3:0], 0: User, 1:FIQ, 2:IRQ, 3:Supervisor
-    if ((tpf->spsr_el1 & 0b1100) == 0) {
-        check_signal(tpf);
-    }
+    /*  M[3:0]
+
+        0b0000  User
+        0b0001  FIQ
+        0b0010  IRQ
+        0b0011  Supervisor
+        0b0111  Abort
+        0b1011  Undefined
+        0b1111  System
+    */
+    // check if there are signals to be done -> when M[3:0] = 00**
+    // uart_sendline("spsr: %x\n", tpf->spsr_el1);
+    // if ((tpf->spsr_el1 & 0b1100) == 0) {
+    check_signal(tpf);
+    // }
 }
 
 void invalid_exception_router(int no) {

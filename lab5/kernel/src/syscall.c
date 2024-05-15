@@ -35,7 +35,8 @@ int getpid(trap_frame *tpf) {
 size_t uart_read(trap_frame *tpf, char buf[], size_t size) {
     int i = 0;
     while (i < size)
-        buf[i++] = uart_async_getc();
+        buf[i++] = uart_getc();
+    // buf[i++] = uart_async_getc();
     tpf->x0 = i;
     return i;
 }
@@ -44,7 +45,8 @@ size_t uart_read(trap_frame *tpf, char buf[], size_t size) {
 size_t uart_write(trap_frame *tpf, const char buf[], size_t size) {
     int i = 0;
     while (i < size)
-        uart_async_putc(buf[i++]);
+        uart_send(buf[i++]);
+    // uart_async_putc(buf[i++]);
     tpf->x0 = i;
     return i;
 }
@@ -110,13 +112,6 @@ void exit(trap_frame *tpf, int status) {
     thread_exit();
 }
 
-// int mbox_call(trap_frame *tpf, unsigned char ch, unsigned int *mbox) {
-//     lock();
-//     tpf->x0 = k_mbox_call(ch, (unsigned int)((unsigned long)mbox));
-//     unlock();
-//     return tpf->x0;
-// }
-
 int mbox_call(trap_frame *tpf, unsigned char ch, unsigned int *mbox) {
     lock();
     unsigned int r = ((unsigned long)mbox & ~0xF) | (ch & 0xF);
@@ -139,7 +134,7 @@ int mbox_call(trap_frame *tpf, unsigned char ch, unsigned int *mbox) {
     return 0;
 }
 
-void kill(trap_frame *tpf, int pid) {
+void kill(int pid) {
     if (pid < 0 || pid > PID_MAX || !thread_list[pid].isused)
         return;
     lock();
@@ -153,13 +148,15 @@ void signal_register(int signal, void (*handler)()) {
     if (signal < 0 || signal > SIGNAL_MAX)
         return;
     get_current()->signal_handler[signal] = handler;
+    uart_sendline("registered handler: %x\n", handler);
 }
 
+// trigger (call) signal handler
 void signal_kill(int pid, int signal) {
     if (pid < 0 || pid > PID_MAX || !thread_list[pid].isused)
         return;
     lock();
-    thread_list[pid].iszombie = 1;
+    thread_list[pid].sigcount[signal]++;
     unlock();
 }
 
