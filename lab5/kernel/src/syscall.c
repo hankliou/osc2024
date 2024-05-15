@@ -92,7 +92,6 @@ int fork(trap_frame *tpf) {
         // child move it's "user sp" with same offset of it's parent
         tpf->sp_el0 += child->user_stack_ptr - parent->user_stack_ptr;
         tpf->x0 = 0;
-        unlock();
         return 0; // jump to link register
     }
 

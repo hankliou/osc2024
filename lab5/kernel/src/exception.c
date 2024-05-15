@@ -96,7 +96,7 @@ void el1h_irq_router(trap_frame *tpf) {
         add_irq_task(timer_handler, TIMER_IRQ_PRIORITY);
         timer_enable_interrupt();
         // at least two thread running -> schedule for any timer irq
-        if (run_queue->next->next != run_queue)
+        if (run_queue && run_queue->next && run_queue->next->next != run_queue)
             schedule();
     }
 
