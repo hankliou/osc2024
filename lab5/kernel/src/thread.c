@@ -23,6 +23,7 @@ void init_thread() {
         thread_list[i].isused = 0;
         thread_list[i].iszombie = 0;
         thread_list[i].pid = i;
+        thread_list[i].signal_inProcess = 0;
     }
     thread *cur_thread = thread_create(idle);
     asm volatile("msr tpidr_el1, %0" ::"r"(cur_thread));

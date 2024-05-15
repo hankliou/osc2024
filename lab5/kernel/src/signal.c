@@ -6,7 +6,7 @@
 #include "uart1.h"
 
 extern void store_context(thread_context *addr);
-static void (*cur_signal_handler)() = 0;
+static void (*cur_signal_handler)() = signal_default_handler;
 
 void signal_default_handler() {
     uart_sendline("get current: %d\n", get_current());
@@ -15,6 +15,12 @@ void signal_default_handler() {
 
 void check_signal(trap_frame *tpf) {
     // no need to handle nested signal
+    // if (!get_current()) {
+    //     uart_sendline("error\n");
+    //     return;
+    // }
+    // uart_sendline("%d, ", get_current()->pid);
+    // uart_sendline("%d\n", get_current()->signal_inProcess);
     if (get_current()->signal_inProcess)
         return;
     lock();
@@ -56,7 +62,8 @@ void run_signal(trap_frame *tpf, int idx) {
 }
 
 void signal_handler_wrapper() {
-    cur_signal_handler();
+    if (cur_signal_handler)
+        cur_signal_handler();
     // [signal_return] system call
     asm volatile("mov x8, 99");
     asm volatile("svc 0");

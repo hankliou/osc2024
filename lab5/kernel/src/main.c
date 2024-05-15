@@ -17,16 +17,16 @@ void main(char *arg) {
     dtb_ptr = arg;
     traverse_device_tree(dtb_ptr, dtb_callback_initramfs);
 
-    timer_init_interrupt(); // basic 2, core timer interrupt
-    timer_list_init();      // advanced 1, timer multiplexing
-    irqtask_list_init();    // advanced 2, concurrent IO handling
-
     uart_init();
     uart_sendline("Loading dtb from: 0x%x\n", arg);
     cli_print_banner();
 
     allocator_init();
     init_thread();
+
+    timer_init_interrupt(); // basic 2, core timer interrupt
+    timer_list_init();      // advanced 1, timer multiplexing
+    irqtask_list_init();    // advanced 2, concurrent IO handling
 
     while (1) {
         cli_cmd_clear(input_buffer, CMD_MAX_LEN);
