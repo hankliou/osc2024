@@ -146,14 +146,13 @@ void thread_exec(char *code, unsigned int codesize) {
 }
 
 void schedule_timer() {
-    // add_timer(schedule_timer, "re-schedule", getTimerFreq());
     add_timer(schedule_timer, "re-schedule", getTimerFreq() >> 5);
 }
 
 void foo() {
     for (int i = 0; i < 10; ++i) {
         uart_sendline("Thread id: %d %d\n", get_current()->pid, i);
-        for (int j = 0; j < 10000000; j++)
+        for (int j = 0; j < 1000000; j++)
             asm volatile("nop\n\t");
         schedule();
     }

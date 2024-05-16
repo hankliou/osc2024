@@ -9,25 +9,17 @@ extern void store_context(thread_context *addr);
 static void (*cur_signal_handler)() = signal_default_handler;
 
 void signal_default_handler() {
-    uart_sendline("get current: %d\n", get_current());
     kill(get_current()->pid);
 }
 
 void check_signal(trap_frame *tpf) {
     // no need to handle nested signal
-    // if (!get_current()) {
-    //     uart_sendline("error\n");
-    //     return;
-    // }
-    // uart_sendline("%d, ", get_current()->pid);
-    // uart_sendline("%d\n", get_current()->signal_inProcess);
     if (get_current()->signal_inProcess)
         return;
     lock();
     get_current()->signal_inProcess = 1;
     unlock();
 
-    // uart_sendline("c ");
     for (int i = 0; i <= SIGNAL_MAX; i++) {
         store_context(&(get_current()->signal_savedContext));
         if (get_current()->sigcount[i] > 0) {

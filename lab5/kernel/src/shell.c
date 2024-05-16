@@ -394,7 +394,6 @@ void do_cmd_thread_test() {
     for (int i = 0; i < 5; i++) {
         uart_sendline("testing: %d\n", thread_create(foo)->pid);
     }
-    // schedule_timer("");
     idle();
 }
 
