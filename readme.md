@@ -24,3 +24,17 @@
    -------<trigger only if UserProcess do syscall>----------        (               CONTENT SWITCHING FOR SIGNAL HANDLER                       )
 
 **/
+
+### signal procedure
+- check signal (every end of exception handling)
+   - ==save signal context==
+      - switch to **el0** and run signal (if is user registered signal)
+      - signal wrapper
+         - exec register func (may change EL 0,1,0,1,...)
+         - **svc** when func done
+            - ==save state==(in exception entry)
+            - sig return
+               - free stack
+               - ==load signal context==
+            - ==load state== (**below will not be run since 'lr' of signal context will be loaded in**)
+         - eret (**will not be run, but load signal context will jump PC to check signal, still in el1**)
