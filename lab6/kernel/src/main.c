@@ -1,6 +1,7 @@
 #include "dtb.h"
 #include "exception.h"
 #include "memory.h"
+#include "mmu.h"
 #include "shell.h"
 #include "thread.h"
 #include "timer.h"
