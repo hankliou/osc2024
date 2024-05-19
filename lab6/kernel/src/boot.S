@@ -32,7 +32,7 @@ setup_mmu_config:
     // The first page of PUD maps 0x00000000 - 0x3fffffff (RAM and GPU peripherals)
     mov     x3, 0x00000000          
     orr     x3, x2, x3              // [MMU_PUD_ADDR] = 0x00000000 | BOOT_PUD_ATTR
-    str     x3, [x4]                // 1st 1GB mapped by the 1st entry of PUD
+    str     x3, [x1]                // 1st 1GB mapped by the 1st entry of PUD
     // The second page of PUD maps 0x40000000 - 0x7fffffff (ARM local peripherals).
     mov     x3, 0x40000000
     orr     x3, x2, x3              // [MMU_PUD_ADDR + 8] = 0x40000000 | BOOT_PUD_ATTR
@@ -47,7 +47,7 @@ setup_mmu_config:
     bl      set_2M_kernel_mmu
     
     mrs     x2, sctlr_el1           // sctlr_el1: Provides top level control of the system, including its memory system, at EL1 and EL0.
-    orr     x2 , x2, 1              // sctlr_el1[0]: EL1&0 stage 1 address translation enabled/disabled.
+    orr     x2, x2, 1               // sctlr_el1[0]: EL1&0 stage 1 address translation enabled/disabled.
     msr     sctlr_el1, x2           // enable MMU, cache remains disabled
 
     // indirect branch to the virtual address

@@ -1,3 +1,5 @@
+#include "stddef.h"
+
 #ifndef _MMU_H_
 #define _MMU_H_
 
@@ -33,6 +35,10 @@
 #define PERIPHERAL_START 0x3c000000L
 #define PERIPHERAL_END 0x3f000000L
 
+#define USER_KERNEL_BASE 0x0L
+#define USER_STACK_BASE 0xfffffffff000L
+#define USER_SIGNAL_WRAPPER_VA 0xffffffff9000L
+
 // Virtual address for kernel
 #define BOOT_PGD_ATTR (PD_TABLE)
 #define BOOT_PUD_ATTR (PD_TABLE | PD_ACCESS)
@@ -41,7 +47,27 @@
 
 #ifndef __ASSEMBLER__
 
+typedef struct vm_area_struct {
+    struct vm_area_struct *next;
+    struct vm_area_struct *prev;
+    unsigned long virt_addr;
+    unsigned long phys_addr;
+    unsigned long area_size;
+    unsigned long rwx; // 1, 2, 4
+    int is_allocated;
+} vm_area_struct;
+
 void *set_2M_kernel_mmu(void *x0);
+void map_page(size_t *virt_pgd_p, size_t va, size_t pa, size_t flag);
+
+#include "thread.h"
+typedef struct thread thread;
+void mmu_add_vma(thread *t, size_t va, size_t size, size_t pa, size_t rwx, int is_allocated);
+void mmu_del_vma(thread *t);
+void mmu_map_pages(size_t *pgd_ptr, size_t va, size_t size, size_t pa, size_t flag);
+void mmu_free_page_tables(size_t *page_table, int level);
+
+// void mmu_memfail_abort_handle(esr)
 
 #endif // __ASSEMBLER__
 

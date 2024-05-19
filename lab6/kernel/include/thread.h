@@ -2,8 +2,8 @@
 #define _THREAD_H_
 
 #define PID_MAX 32678 // Linux kernel defined limit 2^15
-#define USTACK_SIZE 0x1000
-#define KSTACK_SIZE 0x1000
+#define USTACK_SIZE 0x4000
+#define KSTACK_SIZE 0x4000
 #define SIGNAL_MAX 64
 
 typedef struct thread_context {
@@ -24,8 +24,10 @@ typedef struct thread_context {
     unsigned long fp; // frame pointer: base pointer for local variable in stack
     unsigned long lr; // link register: store return address
     unsigned long sp; // stack pointer:
+    void *pgd;        // for MMU mapping (user space)
 } thread_context;
 
+#include "mmu.h"
 typedef struct thread {
     thread_context context; // context(registers) need to store
     struct thread *next;
@@ -43,6 +45,8 @@ typedef struct thread {
     void (*curr_signal_handler)();            // Allow Signal handler overwritten by others
     int signal_inProcess;                     // Signal Processing Lock (flag)
     thread_context signal_savedContext;       // Store registers before signal handler involving
+
+    struct vm_area_struct vma_list; // shared memory list (virtual memory)
 } thread;
 
 extern void switch_to(void *curr_context, void *next_context);
