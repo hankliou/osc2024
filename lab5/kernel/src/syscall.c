@@ -147,7 +147,6 @@ void signal_register(int signal, void (*handler)()) {
     if (signal < 0 || signal > SIGNAL_MAX)
         return;
     get_current()->signal_handler[signal] = handler;
-    uart_sendline("registered handler: %x\n", handler);
 }
 
 // trigger (call) signal handler
