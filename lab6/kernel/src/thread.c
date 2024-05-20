@@ -55,12 +55,6 @@ thread *thread_create(void *funcion_start_point) {
     // sp init to the top of allocated stack area
     the_thread->context.sp = (unsigned long)the_thread->user_stack_ptr + USTACK_SIZE;
     the_thread->context.fp = the_thread->context.sp; // fp is the base addr, sp won't upper than fp
-    // init virtual frame list
-    the_thread->vma_list.next = &(the_thread->vma_list);
-    the_thread->vma_list.prev = &(the_thread->vma_list);
-    // init pgd for process itself
-    the_thread->context.pgd = kmalloc(0x1000);
-    memset(the_thread->context.pgd, 0, 0x1000);
 
     // signal
     the_thread->signal_inProcess = 0;
@@ -95,7 +89,7 @@ void schedule() {
     thread *cur_thread = get_current();
     do {
         cur_thread = cur_thread->next;
-    } while (cur_thread == run_queue || cur_thread->iszombie);
+    } while (cur_thread == run_queue);
     unlock();
 
     // context switch (defined in asm)
@@ -152,14 +146,13 @@ void thread_exec(char *code, unsigned int codesize) {
 }
 
 void schedule_timer() {
-    // add_timer(schedule_timer, "re-schedule", getTimerFreq());
     add_timer(schedule_timer, "re-schedule", getTimerFreq() >> 5);
 }
 
 void foo() {
     for (int i = 0; i < 10; ++i) {
         uart_sendline("Thread id: %d %d\n", get_current()->pid, i);
-        for (int j = 0; j < 10000000; j++)
+        for (int j = 0; j < 1000000; j++)
             asm volatile("nop\n\t");
         schedule();
     }

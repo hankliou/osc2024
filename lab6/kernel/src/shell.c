@@ -195,7 +195,7 @@ void do_cmd_testAsyncUart() {
 
 void cli_print_banner() {
     uart_sendline("=======================================\r\n");
-    uart_sendline("  Welcome to NYCU-OSC 2024 Lab6 Shell  \r\n");
+    uart_sendline("  Welcome to NYCU-OSC 2024 Lab5 Shell  \r\n");
     uart_sendline("=======================================\r\n");
 }
 
@@ -394,7 +394,6 @@ void do_cmd_thread_test() {
     for (int i = 0; i < 5; i++) {
         uart_sendline("testing: %d\n", thread_create(foo)->pid);
     }
-    // schedule_timer("");
     idle();
 }
 
