@@ -11,18 +11,16 @@ extern char *dtb_ptr;
 char input_buffer[CMD_MAX_LEN];
 
 void main(char *arg) {
-    // debug: check EL(exception level) by watch reg
-    getCurrentEL();
+    uart_init();
+    uart_sendline("Loading dtb from: 0x%x\n", arg);
+
+    allocator_init();
+    init_thread();
 
     dtb_ptr = arg;
     traverse_device_tree(dtb_ptr, dtb_callback_initramfs);
 
-    uart_init();
-    uart_sendline("Loading dtb from: 0x%x\n", arg);
     cli_print_banner();
-
-    allocator_init();
-    init_thread();
 
     timer_init_interrupt(); // basic 2, core timer interrupt
     timer_list_init();      // advanced 1, timer multiplexing

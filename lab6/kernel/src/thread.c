@@ -6,8 +6,8 @@
 #include "u_string.h"
 #include "uart1.h"
 
-thread *run_queue;
 thread thread_list[PID_MAX + 1];
+thread *run_queue = thread_list;
 
 int pid_cnt = 0;
 
@@ -20,10 +20,15 @@ void init_thread() {
     run_queue->pid = -1; // debug usage
 
     for (int i = 0; i <= PID_MAX; i++) {
+        // lab5 thread's init
         thread_list[i].isused = 0;
         thread_list[i].iszombie = 0;
         thread_list[i].pid = i;
         thread_list[i].signal_inProcess = 0;
+
+        // lab6 vm's init
+        thread_list[i].vma_list.next = &thread_list[i].vma_list;
+        thread_list[i].vma_list.prev = &thread_list[i].vma_list;
     }
     thread *cur_thread = thread_create(idle);
     asm volatile("msr tpidr_el1, %0" ::"r"(cur_thread));
@@ -55,6 +60,10 @@ thread *thread_create(void *funcion_start_point) {
     // sp init to the top of allocated stack area
     the_thread->context.sp = (unsigned long)the_thread->user_stack_ptr + USTACK_SIZE;
     the_thread->context.fp = the_thread->context.sp; // fp is the base addr, sp won't upper than fp
+
+    // vm list
+    the_thread->context.pgd = kmalloc(0x1000);
+    memset(the_thread->context.pgd, 0, 0x1000);
 
     // signal
     the_thread->signal_inProcess = 0;
@@ -118,6 +127,7 @@ void kill_zombie() {
             // remove from list
             cur->next->prev = cur->prev;
             cur->prev->next = cur->next;
+            // lab6 remove vm tables
             // release memory
             kfree(cur->kernel_stack_ptr);
             kfree(cur->user_stack_ptr);
@@ -136,11 +146,15 @@ void thread_exec(char *code, unsigned int codesize) {
     t->code = kmalloc(codesize);
     memcpy(t->code, code, codesize);
     t->context.lr = (unsigned long)t->code;
+    // basic EL switch setup
     asm volatile("msr tpidr_el1, %0;" ::"r"(&t->context));                // hold the "kernel(el1)" thread structure info
     asm volatile("msr elr_el1, %0;" ::"r"(t->context.lr));                // set exception return addr to 'c_filedata'
     asm volatile("msr spsr_el1, %0;" ::"r"(0x0));                         // set state to user mode, and enable interrupt
     asm volatile("msr sp_el0, %0;" ::"r"(t->context.sp));                 //
     asm volatile("mov sp, %0;" ::"r"(t->kernel_stack_ptr + KSTACK_SIZE)); // set el0's sp to top of new stack
+
+    // vm related setup
+    // TODO: find out param in mmu_add_vma mean
     add_timer(schedule_timer, "", getTimerFreq());
     asm volatile("eret;"); // switch EL to 0
 }

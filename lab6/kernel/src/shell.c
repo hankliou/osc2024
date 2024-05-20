@@ -195,7 +195,7 @@ void do_cmd_testAsyncUart() {
 
 void cli_print_banner() {
     uart_sendline("=======================================\r\n");
-    uart_sendline("  Welcome to NYCU-OSC 2024 Lab5 Shell  \r\n");
+    uart_sendline("  Welcome to NYCU-OSC 2024 Lab6 Shell  \r\n");
     uart_sendline("=======================================\r\n");
 }
 
@@ -340,9 +340,12 @@ void do_cmd_mem_test() {
     char *p1 = kmalloc(0x82000);
     char *p2 = kmalloc(0x90000);
     char *p3 = kmalloc(0x200000);
-    char *p4 = kmalloc(0x390000);
+    uart_sendline("kmalloc: 0x%x\n", p1);
+    uart_sendline("kmalloc: 0x%x\n", p2);
+    uart_sendline("kmalloc: 0x%x\n", p3);
+    // char *p4 = kmalloc(0x390000);
     kfree(p3);
-    kfree(p4);
+    // kfree(p4);
     kfree(p1);
     kfree(p2);
     char *a = kmalloc(0x1000);

@@ -6,6 +6,8 @@
 #define KSTACK_SIZE 0x1000
 #define SIGNAL_MAX 64
 
+#include "mmu.h"
+
 typedef struct thread_context {
     // callee saved registers
     // https://developer.arm.com/documentation/102374/0101/Procedure-Call-Standard
@@ -24,6 +26,7 @@ typedef struct thread_context {
     unsigned long fp; // frame pointer: base pointer for local variable in stack
     unsigned long lr; // link register: store return address
     unsigned long sp; // stack pointer:
+    void *pgd;        // use for MMU mapping in user space
 } thread_context;
 
 typedef struct thread {
@@ -43,6 +46,8 @@ typedef struct thread {
     void (*curr_signal_handler)();            // Allow Signal handler overwritten by others
     int signal_inProcess;                     // Signal Processing Lock (flag)
     thread_context signal_savedContext;       // Store registers before signal handler involving
+
+    vm_area_struct vma_list; // shared memory list (virtual memory)
 } thread;
 
 extern void switch_to(void *curr_context, void *next_context);

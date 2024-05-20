@@ -2,8 +2,8 @@ _heap_stack_size = 8M;
 
 SECTIONS
 {
-    /* bootloader = 0x60000, kernel = 0x80000 */
-    . = 0x80000;
+    . = 0xffff000000000000; /* kernel space */
+    . += 0x80000;           /* kernel load address*/
     _start = .;
     .text : { *(.text.boot) *(.text) }
     .rodata : { *(rodata) }
