@@ -48,7 +48,7 @@ typedef enum {
 } mbox_tag_type;
 
 #define MBOX_TAG_REQUEST_CODE 0x00000000
-#define MBOX_TAG_LAST_BYTE 0x00000000
+#define MBOX_TAG_LAST_BYTE    0x00000000
 
 int k_mbox_call(mbox_channel_type, unsigned int);
 

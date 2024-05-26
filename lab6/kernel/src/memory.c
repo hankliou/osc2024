@@ -1,5 +1,6 @@
 #include "memory.h"
 #include "dtb.h"
+#include "mmu_constant.h"
 #include "uart1.h"
 
 extern char _heap_top;
@@ -26,8 +27,7 @@ void *simple_malloc(unsigned int size) {
     return r;
 }
 
-void free(void *ptr) {
-}
+void free(void *ptr) {}
 
 /* lab 4 */
 extern char _start; // defined in linker
@@ -82,15 +82,16 @@ void allocator_init() {
     // dump_free_frame_list();
 
     // start up allocation
-    // uart_sendline("Buddy system usable memory from 0x%x to 0x%x\n", ALLOCATION_BASE, ALLOCATION_END);
-    // uart_sendline("Page size: %d Byte, total available frame: %d\n", PAGE_SIZE, MAX_PAGE);
-    // uart_sendline("[Start up allocation]\n");
-    // uart_sendline("\nSpin tables & DTB:");
-    // dtb_get_reserved_memory(); // spin tables and dtb itself
-    // uart_sendline("\n_start ~ _end:");
-    // memory_reserve((unsigned long long)&_start, (unsigned long long)&_end); // kernel image (stack, heap included)
-    // uart_sendline("\nCPIO_DEFAULT_START ~ CPIO_DEFAULT_END:");
-    // memory_reserve((unsigned long long)CPIO_DEFAULT_START, (unsigned long long)CPIO_DEFAULT_END); // initramfs
+    uart_sendline("Buddy system usable memory from 0x%x to 0x%x\n", ALLOCATION_BASE, ALLOCATION_END);
+    uart_sendline("Page size: %d Byte, total available frame: %d\n", PAGE_SIZE, MAX_PAGE);
+    uart_sendline("[Start up allocation]\n");
+    uart_sendline("\nSpin tables & DTB:");
+    dtb_get_reserved_memory(); // spin tables and dtb itself
+    memory_reserve(UADDR_TO_KADDR(MMU_PGD_ADDR), UADDR_TO_KADDR(MMU_PTE_ADDR + 0x2000));
+    uart_sendline("\n_start ~ _end:");
+    memory_reserve((unsigned long long)&_start, (unsigned long long)&_end); // kernel image (stack, heap included)
+    uart_sendline("\nCPIO_DEFAULT_START ~ CPIO_DEFAULT_END:");
+    memory_reserve((unsigned long long)CPIO_DEFAULT_START, (unsigned long long)CPIO_DEFAULT_END); // initramfs
     // dump_free_frame_list();
 }
 
@@ -190,12 +191,10 @@ int coalesce(frame **ptr) {
     frame *buddy = &frame_array[frame_ptr->idx ^ (1 << frame_ptr->val)];
 
     // frame must in same level (varify if buddy is free)
-    if (frame_ptr->val != buddy->val)
-        return -1;
+    if (frame_ptr->val != buddy->val) return -1;
 
     // buddy is in used
-    if (buddy->used != FRAME_FREE_FLAG)
-        return -1;
+    if (buddy->used != FRAME_FREE_FLAG) return -1;
 
     // uart_sendline("[Coalesce] Merge frame %d and frame %d\n", frame_ptr->idx, buddy->idx);
 
@@ -204,8 +203,7 @@ int coalesce(frame **ptr) {
     buddy->next->prev = buddy->prev;
 
     // ptr point to head of merged frames
-    if (buddy->idx < frame_ptr->idx)
-        *ptr = buddy;
+    if (buddy->idx < frame_ptr->idx) *ptr = buddy;
 
     // since merge, upgrade level
     (*ptr)->val++;
@@ -259,8 +257,7 @@ void *dynamic_malloc(unsigned int size) {
 
     // find the level needed
     int expo = 0;
-    while ((1 << expo) < size)
-        expo++;
+    while ((1 << expo) < size) expo++;
 
     // if no free slot
     if (free_slot_list[expo].next == &free_slot_list[expo]) {
@@ -333,7 +330,7 @@ void kfree(void *ptr) {
 // start, end: address (e.g. 0x1234 5678), a frame contains 0x8000 bits !!!
 void memory_reserve(unsigned long long start, unsigned long long end) {
     // turn start, end into frame idx
-    // uart_sendline("\nReserve Memory from 0x%8x to 0x%8x", start, end);
+    uart_sendline("\nReserve Memory from 0x%8x to 0x%8x", start, end);
     start = ((start - ALLOCATION_BASE) >> PAGE_LEVEL);
     end = (end % (1 << PAGE_LEVEL)) == 0 ? ((end - ALLOCATION_BASE) >> PAGE_LEVEL) : ((end - ALLOCATION_BASE) >> PAGE_LEVEL) + 1;
     // uart_sendline(" (frame %d ~ %d)\n", start, end);
@@ -345,8 +342,8 @@ void memory_reserve(unsigned long long start, unsigned long long end) {
             int frame_start = it->idx, frame_end = it->idx + (1 << it->val); // get the range of frames
             // reserve
             if (start <= frame_start && frame_end <= end) {
-                // uart_sendline("[Reserve] 0x%8x ~ 0x%8x\n", ((it->idx << PAGE_LEVEL) + ALLOCATION_BASE),
-                //               (((it->idx + (1 << it->val)) << PAGE_LEVEL) + ALLOCATION_BASE));
+                uart_sendline("\n[Reserve] 0x%8x ~ 0x%8x\n", ((it->idx << PAGE_LEVEL) + ALLOCATION_BASE),
+                              (((it->idx + (1 << it->val)) << PAGE_LEVEL) + ALLOCATION_BASE));
                 it->used = FRAME_OCCUPIED_FLAG;
                 it->prev->next = it->next;
                 it->next->prev = it->prev;

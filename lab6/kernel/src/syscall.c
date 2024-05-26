@@ -34,8 +34,7 @@ int getpid(trap_frame *tpf) {
 // user have to allocate spaces to x0(buf) themself
 size_t uart_read(trap_frame *tpf, char buf[], size_t size) {
     int i = 0;
-    while (i < size)
-        buf[i++] = uart_getc();
+    while (i < size) buf[i++] = uart_getc();
     // buf[i++] = uart_async_getc();
     tpf->x0 = i;
     return i;
@@ -44,8 +43,7 @@ size_t uart_read(trap_frame *tpf, char buf[], size_t size) {
 // user have to allocate spaces to x0(buf) themself
 size_t uart_write(trap_frame *tpf, const char buf[], size_t size) {
     int i = 0;
-    while (i < size)
-        uart_send(buf[i++]);
+    while (i < size) uart_send(buf[i++]);
     // uart_async_putc(buf[i++]);
     tpf->x0 = i;
     return i;
@@ -54,12 +52,28 @@ size_t uart_write(trap_frame *tpf, const char buf[], size_t size) {
 // Note: In this lab, you won’t have to deal with argument passing, but you can still use it.
 int exec(trap_frame *tpf, const char *name, char *const argv[]) {
     thread *cur_thread = get_current();
+
+    // init virtual memory list
+    mmu_del_vma(cur_thread); // empty whole vma_list
+    cur_thread->vma_list.next = &(cur_thread->vma_list);
+    cur_thread->vma_list.prev = &(cur_thread->vma_list);
+
+    // BUG: no this segment in lab5
+    // init thread itself code
+    // kfree(cur_thread->code);
     cur_thread->codesize = get_file_size((char *)name);
+    // cur_thread->code = kmalloc(cur_thread->codesize);
     memcpy(cur_thread->code, get_file_start((char *)name), cur_thread->codesize);
+    // cur_thread->user_stack_ptr = kmalloc(USTACK_SIZE);
+
+    // TODO
+    // asm volatile("dsb ish");                          // memory barrier
+    // mmu_free_page_tables(cur_thread->context.pgd, 0); // empty thread itself pgd
+    // uart_sendline("pgd: %x\n", cur_thread->context.pgd);
+    // memset(phys)
 
     // init signal handler
-    for (int i = 0; i <= SIGNAL_MAX; i++)
-        cur_thread->signal_handler[i] = signal_default_handler;
+    for (int i = 0; i <= SIGNAL_MAX; i++) cur_thread->signal_handler[i] = signal_default_handler;
 
     tpf->elr_el1 = (unsigned long)cur_thread->code;
     tpf->sp_el0 = (unsigned long)cur_thread->user_stack_ptr + USTACK_SIZE;
@@ -71,16 +85,15 @@ int exec(trap_frame *tpf, const char *name, char *const argv[]) {
 int fork(trap_frame *tpf) {
     lock();
 
-    thread *child = thread_create(get_current()->code);                     // create new thread
-    thread *parent = get_current();                                         // backup parent thread
-    int parent_id = parent->pid;                                            // record original pid
-    child->codesize = parent->codesize;                                     // assign size
-    memcpy(child->user_stack_ptr, parent->user_stack_ptr, USTACK_SIZE);     // copy user stack (deep copy)
-    memcpy(child->kernel_stack_ptr, parent->kernel_stack_ptr, KSTACK_SIZE); // copy kernel stack (deep copy)
+    thread *child = thread_create(get_current()->code, get_current()->codesize); // create new thread
+    thread *parent = get_current();                                              // backup parent thread
+    int parent_id = parent->pid;                                                 // record original pid
+    child->codesize = parent->codesize;                                          // assign size
+    memcpy(child->user_stack_ptr, parent->user_stack_ptr, USTACK_SIZE);          // copy user stack (deep copy)
+    memcpy(child->kernel_stack_ptr, parent->kernel_stack_ptr, KSTACK_SIZE);      // copy kernel stack (deep copy)
 
     // copy signal handler
-    for (int i = 0; i <= SIGNAL_MAX; i++)
-        child->signal_handler[i] = parent->signal_handler[i];
+    for (int i = 0; i <= SIGNAL_MAX; i++) child->signal_handler[i] = parent->signal_handler[i];
 
     // before coping context, update parent's context first!!!
     store_context((thread_context *)get_current()); // mainly storing lr and sp
@@ -107,21 +120,17 @@ int fork(trap_frame *tpf) {
     return child->pid; // return child's pid
 }
 
-void exit(trap_frame *tpf, int status) {
-    thread_exit();
-}
+void exit(trap_frame *tpf, int status) { thread_exit(); }
 
 int mbox_call(trap_frame *tpf, unsigned char ch, unsigned int *mbox) {
     lock();
     unsigned int r = ((unsigned long)mbox & ~0xF) | (ch & 0xF);
     // Wait until we can write to the mailbox
-    while (*MBOX_STATUS & BCM_ARM_VC_MS_FULL)
-        ;
+    while (*MBOX_STATUS & BCM_ARM_VC_MS_FULL);
     *MBOX_WRITE = r; // Write the request
     while (1) {
         // Wait for the response
-        while (*MBOX_STATUS & BCM_ARM_VC_MS_EMPTY)
-            ;
+        while (*MBOX_STATUS & BCM_ARM_VC_MS_EMPTY);
         if (r == *MBOX_READ) {
             tpf->x0 = (mbox[1] == MBOX_REQUEST_SUCCEED);
             unlock();
@@ -134,8 +143,7 @@ int mbox_call(trap_frame *tpf, unsigned char ch, unsigned int *mbox) {
 }
 
 void kill(int pid) {
-    if (pid < 0 || pid > PID_MAX || !thread_list[pid].isused)
-        return;
+    if (pid < 0 || pid > PID_MAX || !thread_list[pid].isused) return;
     lock();
     thread_list[pid].iszombie = 1;
     unlock();
@@ -144,15 +152,13 @@ void kill(int pid) {
 
 /* signal related functions */
 void signal_register(int signal, void (*handler)()) {
-    if (signal < 0 || signal > SIGNAL_MAX)
-        return;
+    if (signal < 0 || signal > SIGNAL_MAX) return;
     get_current()->signal_handler[signal] = handler;
 }
 
 // trigger (call) signal handler
 void signal_kill(int pid, int signal) {
-    if (pid < 0 || pid > PID_MAX || !thread_list[pid].isused)
-        return;
+    if (pid < 0 || pid > PID_MAX || !thread_list[pid].isused) return;
     lock();
     thread_list[pid].sigcount[signal]++;
     unlock();
@@ -180,12 +186,10 @@ unsigned int get_file_size(char *path) {
             uart_sendline("cpio parse error\n");
             return -1;
         }
-        if (strcmp(filepath, path) == 0)
-            return filesize;
+        if (strcmp(filepath, path) == 0) return filesize;
 
         // if TRAILER!!!
-        if (head == 0)
-            uart_sendline("execfile: %s: No such file or directory\n", path);
+        if (head == 0) uart_sendline("execfile: %s: No such file or directory\n", path);
     }
     return 0;
 }
@@ -202,12 +206,10 @@ char *get_file_start(char *path) {
             uart_sendline("cpio parse error\n");
             break;
         }
-        if (strcmp(filepath, path) == 0)
-            return filedata;
+        if (strcmp(filepath, path) == 0) return filedata;
 
         // if TRAILER!!!
-        if (head == 0)
-            uart_sendline("execfile: %s: No such file or directory\n", path);
+        if (head == 0) uart_sendline("execfile: %s: No such file or directory\n", path);
     }
     return 0;
 }

@@ -7,10 +7,10 @@
 // manipulate device tree with dtb file format
 // linux kernel fdt.h
 #define FDT_BEGIN_NODE 0x00000001
-#define FDT_END_NODE 0x00000002
-#define FDT_PROP 0x00000003
-#define FDT_NOP 0x00000004
-#define FDT_END 0x00000009
+#define FDT_END_NODE   0x00000002
+#define FDT_PROP       0x00000003
+#define FDT_NOP        0x00000004
+#define FDT_END        0x00000009
 
 typedef void (*dtb_callback)(uint32_t node_type, char *name, void *value, uint32_t name_size);
 

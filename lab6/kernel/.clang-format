@@ -3,7 +3,8 @@ ColumnLimit: 150
 IndentWidth: 4
 UseTab: Never
 AllowShortBlocksOnASingleLine: true
-AllowShortFunctionsOnASingleLine: None
-AllowShortIfStatementsOnASingleLine: false
-AllowShortLoopsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: true
+AllowShortIfStatementsOnASingleLine: true
+AllowShortLoopsOnASingleLine: true
 BreakBeforeBraces: Attach
+AlignConsecutiveMacros: true

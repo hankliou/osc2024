@@ -10,6 +10,7 @@ typedef struct timer_node {
 } timer_node;
 
 void timer_init_interrupt();
+// BUG: lack of masking timer control bit (0x4000 0040)
 void timer_enable_interrupt();
 void timer_disable_interrupt();
 

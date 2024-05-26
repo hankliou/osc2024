@@ -1,10 +1,10 @@
 #ifndef _THREAD_H_
 #define _THREAD_H_
 
-#define PID_MAX 32678 // Linux kernel defined limit 2^15
-#define USTACK_SIZE 0x1000
-#define KSTACK_SIZE 0x1000
-#define SIGNAL_MAX 64
+#define PID_MAX     32678 // Linux kernel defined limit 2^15
+#define USTACK_SIZE 0x4000
+#define KSTACK_SIZE 0x4000
+#define SIGNAL_MAX  64
 
 #include "mmu.h"
 
@@ -56,7 +56,7 @@ extern void store_context(thread_context *addr);
 extern void load_context(thread_context *addr);
 
 void init_thread();
-thread *thread_create(void *funcion_start_point);    // runable function
+thread *thread_create(void *func, size_t filesize);  // runable function
 void schedule();                                     // switch to next job
 void idle();                                         // keep scheduling
 void thread_exit();                                  // mark thread 'zombie'

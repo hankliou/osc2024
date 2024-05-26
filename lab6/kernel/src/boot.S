@@ -9,6 +9,10 @@ _start:
     //b           setup_exception_vector_table
 
 setup_mmu_config:
+    mrs         x1, sctlr_el1
+    bic         x1, x1, 0x1000 // disable instruction cache, bit[12]
+    bic         x1, x1, 0x4 //disable data cache
+
     // translation control register (TCR), paging is configured by TCR
     // set paging configuration (up : 0xffff000000000000 low : 0x0000000000000000)
     ldr         x4, = TCR_CONFIG_DEFAULT
@@ -24,18 +28,20 @@ setup_mmu_config:
     ldr         x4, = MMU_PGD_ADDR // PGD's page frame at 0x1000
     ldr         x1, = MMU_PUD_ADDR // PUD's page frame at 0x2000
 
-    ldr         x2, = BOOT_PGD_ATTR
+    // setup PGD
+    ldr         x2, = BOOT_PGD_ATTR // x2 = 0b11
     orr         x2, x1, x2          // combine the physical address of next level page with attribute.
-    str         x2, [x4]            // [MMU_PGD_ADDR] = MMU_PUD_ADDR | BOOT_PGD_ATTR
+    str         x2, [x4]            // *(MMU_PGD_ADDR) = MMU_PUD_ADDR | 0b11
 
+    // setup PUD
     ldr         x2, = BOOT_PUD_ATTR
     // The first page of PUD maps 0x00000000 - 0x3fffffff (RAM and GPU peripherals)
     mov         x3, 0x00000000
-    orr         x3, x2, x3          // [MMU_PUD_ADDR] = 0x00000000 | BOOT_PUD_ATTR
+    orr         x3, x2, x3          // *(MMU_PUD_ADDR) = 0x00000000 | BOOT_PUD_ATTR
     str         x3, [x1]            // 1st 1GB mapped by the 1st entry of PUD
     // The second page of PUD maps 0x40000000 - 0x7fffffff (ARM local peripherals).
     mov         x3, 0x40000000
-    orr         x3, x2, x3          // [MMU_PUD_ADDR + 8] = 0x40000000 | BOOT_PUD_ATTR
+    orr         x3, x2, x3          // *(MMU_PUD_ADDR + 8) = 0x40000000 | BOOT_PUD_ATTR
     str         x3, [x1, 8]         // 2nd 1GB mapped by the 2nd entry of PUD
 
     // Map the Kernel Space

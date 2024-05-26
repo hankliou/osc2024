@@ -88,9 +88,7 @@ void traverse_device_tree(void *dtb_ptr, dtb_callback callback) {
             pointer += len;
 
             // since len might not be multiple of 4, check align
-            if ((unsigned long long)pointer % 4 != 0) {
-                pointer += 4 - (unsigned long long)pointer % 4;
-            }
+            if ((unsigned long long)pointer % 4 != 0) { pointer += 4 - (unsigned long long)pointer % 4; }
         }
 
         // if current node is NOP
@@ -121,14 +119,10 @@ void dtb_callback_show_tree(uint32_t node_type, char *name, void *value, uint32_
         level++;
     } else if (node_type == FDT_END_NODE) {
         level--;
-        for (int i = 0; i < level; i++) {
-            uart_sendline("  ");
-        }
+        for (int i = 0; i < level; i++) { uart_sendline("  "); }
         uart_sendline("}\n");
     } else if (node_type == FDT_PROP) {
-        for (int i = 0; i < level; i++) {
-            uart_sendline("  ");
-        }
+        for (int i = 0; i < level; i++) { uart_sendline("  "); }
         uart_sendline("%s\n", name);
     }
 }
@@ -138,10 +132,10 @@ void dtb_callback_initramfs(uint32_t node_type, char *name, void *value, uint32_
     // linux,initrd-start will be assigned by start.elf based on config.txt
     if (node_type == FDT_PROP && strcmp(name, "linux,initrd-start") == 0) {
         // get initramfs's address, then store it into CPIO_DEFAULT_START
-        CPIO_DEFAULT_START = (void *)(unsigned long long)uint32_endian_big2little(*(uint32_t *)value);
+        CPIO_DEFAULT_START = (void *)(unsigned long long)UADDR_TO_KADDR(uint32_endian_big2little(*(uint32_t *)value));
     }
     if (node_type == FDT_PROP && strcmp(name, "linux,initrd-end") == 0) {
-        CPIO_DEFAULT_END = (void *)(unsigned long long)uint32_endian_big2little(*(uint32_t *)value);
+        CPIO_DEFAULT_END = (void *)(unsigned long long)UADDR_TO_KADDR(uint32_endian_big2little(*(uint32_t *)value));
     }
 }
 
@@ -159,8 +153,8 @@ void dtb_get_reserved_memory() {
 
     // reserve dtb-defined memory segment
     while (addr_ptr->address != 0 || addr_ptr->size != 0) {
-        unsigned long long start = uint64_endian_big2little(addr_ptr->address);
-        unsigned long long end = uint64_endian_big2little(addr_ptr->address + addr_ptr->size);
+        unsigned long long start = UADDR_TO_KADDR(uint64_endian_big2little(addr_ptr->address));
+        unsigned long long end = UADDR_TO_KADDR(uint64_endian_big2little(addr_ptr->address + addr_ptr->size));
         memory_reserve(start, end);
         addr_ptr++;
     }

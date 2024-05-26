@@ -52,19 +52,13 @@ void do_cmd_exec(char *filepath) {
 
         // if match
         if (strcmp(c_filepath, filepath) == 0) {
-            // char *ustack = simple_malloc(256);
-            // asm volatile("msr spsr_el1, %0;" ::"r"(0x3c0));      // set state to user mode, and enable interrupt
-            // asm volatile("msr elr_el1, %0;" ::"r"(c_filedata));  // set exception return addr to 'c_filedata'
-            // asm volatile("msr sp_el0, %0;" ::"r"(ustack + 256)); // set el0's sp to top of new stack
-            // asm volatile("eret;");                               // switch EL to 0
             uart_recv_echo_flag = 0;
             thread_exec(c_filedata, c_filesize);
             break;
         }
 
         // if meet TRAILER!!! (last file)
-        if (header_ptr == 0)
-            uart_sendline("cat: %s: No such file or directory.\n", filepath);
+        if (header_ptr == 0) uart_sendline("cat: %s: No such file or directory.\n", filepath);
     }
 }
 
@@ -76,16 +70,13 @@ int cli_cmd_strcmp(const char *p1, const char *p2) {
     do {
         c1 = (unsigned char)*s1++;
         c2 = (unsigned char)*s2++;
-        if (c1 == '\0')
-            return c1 - c2;
+        if (c1 == '\0') return c1 - c2;
     } while (c1 == c2);
     return c1 - c2;
 }
 
 void cli_cmd_clear(char *buffer, int length) {
-    for (int i = 0; i < length; i++) {
-        buffer[i] = '\0';
-    }
+    for (int i = 0; i < length; i++) { buffer[i] = '\0'; }
 };
 
 void cli_cmd_read(char *buffer) {
@@ -117,8 +108,7 @@ void cli_cmd_read(char *buffer) {
 }
 
 void cli_cmd_exec(char *buffer) {
-    if (!buffer)
-        return;
+    if (!buffer) return;
 
     char *cmd = buffer;
     char *argvs; // get the first param after cmd
@@ -180,14 +170,10 @@ void do_cmd_testAsyncUart() {
         while (idx < CMD_MAX_LEN) {
             char c = uart_async_getc();
             buffer[idx++] = c;
-            if (c == '\n')
-                break;
+            if (c == '\n') break;
         }
-        if (buffer[0] == 'q' && buffer[1] == '\n')
-            break;
-        for (int i = 0; i < idx; i++) {
-            uart_async_putc(buffer[i]);
-        }
+        if (buffer[0] == 'q' && buffer[1] == '\n') break;
+        for (int i = 0; i < idx; i++) { uart_async_putc(buffer[i]); }
         uart_async_putc('\r');
         uart_async_putc('\n');
     }
@@ -220,16 +206,12 @@ void do_cmd_cat(char *filepath) {
         }
 
         // if is TRAILER!!!
-        if (header_ptr == 0) {
-            uart_sendline("cat: %s: No such file or directory", filepath);
-        }
+        if (header_ptr == 0) { uart_sendline("cat: %s: No such file or directory", filepath); }
     }
     uart_sendline("\n");
 }
 
-void do_cmd_dtb() {
-    traverse_device_tree(dtb_ptr, dtb_callback_show_tree);
-}
+void do_cmd_dtb() { traverse_device_tree(dtb_ptr, dtb_callback_show_tree); }
 
 void do_cmd_help() {
     for (int i = 0; i < CLI_MAX_CMD; i++) {
@@ -308,9 +290,7 @@ void do_cmd_ls(char *dir) {
             break;
         }
 
-        if (header_ptr != 0) {
-            uart_sendline("%s\n", c_filepath);
-        }
+        if (header_ptr != 0) { uart_sendline("%s\n", c_filepath); }
     }
 }
 
@@ -332,9 +312,7 @@ void do_cmd_set2sTimer(char *msg) {
     add_timer(do_cmd_set2sTimer, msg, 2 * getTimerFreq());
 }
 
-void do_cmd_setTimer(char *msg, int sec) {
-    add_timer(timer_print_msg, msg, sec * getTimerFreq());
-}
+void do_cmd_setTimer(char *msg, int sec) { add_timer(timer_print_msg, msg, sec * getTimerFreq()); }
 
 void do_cmd_mem_test() {
     char *p1 = kmalloc(0x82000);
@@ -345,9 +323,12 @@ void do_cmd_mem_test() {
     uart_sendline("kmalloc: 0x%x\n", p3);
     // char *p4 = kmalloc(0x390000);
     kfree(p3);
+    uart_sendline("free\n");
     // kfree(p4);
     kfree(p1);
+    uart_sendline("free\n");
     kfree(p2);
+    uart_sendline("free\n");
     char *a = kmalloc(0x1000);
     char *b = kmalloc(0x10000);
     char *c = kmalloc(0x100000);
@@ -394,14 +375,12 @@ void do_cmd_mem_test() {
 }
 
 void do_cmd_thread_test() {
-    for (int i = 0; i < 5; i++) {
-        uart_sendline("testing: %d\n", thread_create(foo)->pid);
-    }
+    for (int i = 0; i < 5; i++) { uart_sendline("testing: %d\n", thread_create(foo, 0x1000)->pid); }
     idle();
 }
 
 void do_cmd_syscall_test() {
-    thread_create(fork_test);
+    thread_create(fork_test, 0x1000);
     idle();
 }
 
@@ -490,8 +469,7 @@ void fork_test() {
             while (cnt < 5) {
                 asm volatile("mov %0, sp" : "=r"(cur_sp));
                 uart_sendline("second child pid: %d, cnt: %d, ptr: %x, sp : %x\n", test_getpid(), cnt, &cnt, cur_sp);
-                for (int i = 0; i < 1000000; i++)
-                    asm volatile("nop\n\t");
+                for (int i = 0; i < 1000000; i++) asm volatile("nop\n\t");
                 ++cnt;
             }
         }

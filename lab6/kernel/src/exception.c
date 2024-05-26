@@ -19,8 +19,7 @@ void lock() {
 
 void unlock() {
     lock_count--;
-    if (lock_count <= 0)
-        el1_interrupt_enable(); // leave critical section
+    if (lock_count <= 0) el1_interrupt_enable(); // leave critical section
 }
 
 void el0_sync_router(trap_frame *tpf) {
@@ -31,48 +30,50 @@ void el0_sync_router(trap_frame *tpf) {
     // unsigned long long esrel1;
     // asm volatile("mrs %0, esr_el1" : "=r"(esrel1));
     // uart_sendline("spsr_el1: %x, elr_el1: %x, esr_el1: %x\n", spsrel1, elrel1, esrel1);
+    // uart_sendline("in tpf: \n");
+    // uart_sendline("spel0: %x, elrel1: %x, spsrel1: %x", tpf->sp_el0, tpf->elr_el1, tpf->spsr_el1);
+    // while (1) {};
     // return;
+
+    // handle translation fault
+    unsigned long long esr_reg;
+    asm volatile("mrs %0, esr_el1" : "=r"(esr_reg));
+    esr_el1 *esr = (esr_el1 *)&esr_reg; // set a ptr point to the addr of 'esr_reg' to segment its field
+    if (esr->ec == MEMFAIL_DATA_ABORT_LOWER || esr->ec == MEMFAIL_INST_ABORT_LOWER) {
+        uart_sendline("handling abort\n"); // FIXME
+        mmu_memfail_abort_handler(esr);
+        return;
+    }
 
     el1_interrupt_enable();
     int syscall_no = tpf->x8;
-    // uart_sendline("syscall: %d\n", syscall_no);
-    switch (syscall_no) {
-    case 0:
-        getpid(tpf);
-        break;
-    case 1:
-        // user have to allocate spaces to x0(buf) theirself
+    uart_sendline("syscall: %d\n", syscall_no); // FIXME
+    if (syscall_no == 0) getpid(tpf);
+    // 'UART syscall' user have to allocate spaces to x0(buf) theirself
+    else if (syscall_no == 1)
         uart_read(tpf, (char *)tpf->x0, tpf->x1);
-        break;
-    case 2:
+    else if (syscall_no == 2)
         uart_write(tpf, (char *)tpf->x0, tpf->x1);
-        break;
-    case 3:
+    else if (syscall_no == 3)
         exec(tpf, (char *)tpf->x0, (char **)tpf->x1);
-        break;
-    case 4:
+    else if (syscall_no == 4)
         fork(tpf);
-        break;
-    case 5:
+    else if (syscall_no == 5)
         exit(tpf, tpf->x0);
-        break;
-    case 6:
+    else if (syscall_no == 6)
         mbox_call(tpf, (unsigned char)tpf->x0, (unsigned int *)tpf->x1);
-        break;
-    case 7:
+    else if (syscall_no == 7)
         kill(tpf->x0);
-        break;
-    case 8:
+    else if (syscall_no == 8)
         signal_register(tpf->x0, (void (*)())(tpf->x1));
-        break;
-    case 9:
+    else if (syscall_no == 9)
         signal_kill(tpf->x0, tpf->x1);
-        break;
-    case 99:
+    // else if(syscall_no == 10) getpid(tpf);
+    else if (syscall_no == 99)
         signal_return(tpf);
-        break;
-    default:
+    else {
         uart_sendline("Invalid System Call Number\n");
+        while (1) {};
     }
 }
 
@@ -96,8 +97,7 @@ void el1h_irq_router(trap_frame *tpf) {
         add_irq_task(timer_handler, TIMER_IRQ_PRIORITY);
         timer_enable_interrupt();
         // at least two thread running -> schedule for any timer irq
-        if (run_queue && run_queue->next && run_queue->next->next != run_queue)
-            schedule();
+        if (run_queue && run_queue->next && run_queue->next->next != run_queue) schedule();
     }
 
     /*  M[3:0]
@@ -166,8 +166,7 @@ void add_irq_task(void *callback, unsigned priority) {
         }
     }
     // if not inserted, add at last pos
-    if (it == irq_head)
-        irq_list_insert_front(node, it);
+    if (it == irq_head) irq_list_insert_front(node, it);
 
     // unmask interrupt line
     el1_interrupt_enable();

@@ -12,13 +12,13 @@ char input_buffer[CMD_MAX_LEN];
 
 void main(char *arg) {
     uart_init();
-    uart_sendline("Loading dtb from: 0x%x\n", arg);
+
+    dtb_ptr = UADDR_TO_KADDR(arg);
+    traverse_device_tree(dtb_ptr, dtb_callback_initramfs);
+    uart_sendline("Loading dtb from: 0x%x\n", dtb_ptr);
 
     allocator_init();
     init_thread();
-
-    dtb_ptr = arg;
-    traverse_device_tree(dtb_ptr, dtb_callback_initramfs);
 
     cli_print_banner();
 

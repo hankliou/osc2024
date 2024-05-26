@@ -1,6 +1,7 @@
 #include "thread.h"
 #include "exception.h"
 #include "memory.h"
+#include "mmu_constant.h"
 #include "signal.h"
 #include "timer.h"
 #include "u_string.h"
@@ -24,25 +25,19 @@ void init_thread() {
         thread_list[i].isused = 0;
         thread_list[i].iszombie = 0;
         thread_list[i].pid = i;
-        thread_list[i].signal_inProcess = 0;
-
-        // lab6 vm's init
-        thread_list[i].vma_list.next = &thread_list[i].vma_list;
-        thread_list[i].vma_list.prev = &thread_list[i].vma_list;
     }
-    thread *cur_thread = thread_create(idle);
+    thread *cur_thread = thread_create(idle, 0x1000);
     asm volatile("msr tpidr_el1, %0" ::"r"(cur_thread));
 
     unlock();
 }
 
-thread *thread_create(void *funcion_start_point) {
+thread *thread_create(void *func, size_t codesize) {
     lock();
     thread *the_thread;
-    if (pid_cnt > PID_MAX)
-        return 0;
+    if (pid_cnt > PID_MAX) return 0;
 
-    // check the pid in thread_list, if not use yet, take it
+    // pick a pid
     // TODO: pid_cnt need to mod max size
     if (!thread_list[pid_cnt].isused)
         the_thread = &thread_list[pid_cnt++];
@@ -52,18 +47,16 @@ thread *thread_create(void *funcion_start_point) {
     // init property of 'the_thread'
     the_thread->iszombie = 0;
     the_thread->isused = 1;
+    the_thread->codesize = codesize;
+    the_thread->code = kmalloc(codesize);
     the_thread->user_stack_ptr = kmalloc(USTACK_SIZE);
     // uart_sendline("ustack allocate: 0x%x\n", the_thread->user_stack_ptr);
     the_thread->kernel_stack_ptr = kmalloc(KSTACK_SIZE);
     // uart_sendline("kstack allocate: 0x%x\n", the_thread->kernel_stack_ptr);
-    the_thread->context.lr = (unsigned long)funcion_start_point;
+    the_thread->context.lr = (unsigned long)func;
     // sp init to the top of allocated stack area
     the_thread->context.sp = (unsigned long)the_thread->user_stack_ptr + USTACK_SIZE;
     the_thread->context.fp = the_thread->context.sp; // fp is the base addr, sp won't upper than fp
-
-    // vm list
-    the_thread->context.pgd = kmalloc(0x1000);
-    memset(the_thread->context.pgd, 0, 0x1000);
 
     // signal
     the_thread->signal_inProcess = 0;
@@ -71,6 +64,12 @@ thread *thread_create(void *funcion_start_point) {
         the_thread->sigcount[i] = 0;
         the_thread->signal_handler[i] = signal_default_handler;
     }
+
+    // lab6 vm's init
+    the_thread->vma_list.next = &the_thread->vma_list;
+    the_thread->vma_list.prev = &the_thread->vma_list;
+    the_thread->context.pgd = kmalloc(0x1000); // BUG: diff with sample, modified back, page table should left in kernel space
+    memset(the_thread->context.pgd, 0, 0x1000);
 
     // add it into run_queue tail
     the_thread->prev = run_queue->prev;
@@ -85,7 +84,7 @@ thread *thread_create(void *funcion_start_point) {
 void from_el1_to_el0(thread *t) {
     asm volatile("msr tpidr_el1, %0" ::"r"(&t->context)); // hold the kernel(el1) thread structure info
     asm volatile("msr elr_el1, lr");                      // get back to caller function
-    asm volatile("msr spsr_el1, %0" ::"r"(0x340));        // disable E A I F
+    asm volatile("msr spsr_el1, %0" ::"r"(0x340));        // disable 'EAF' in E A I F
     asm volatile("msr sp_el0, %0" ::"r"(t->context.sp));
     asm volatile("mov sp, %0" ::"r"(t->kernel_stack_ptr + KSTACK_SIZE));
     asm volatile("eret");
@@ -94,20 +93,20 @@ void from_el1_to_el0(thread *t) {
 // find a job to schedule, otherwise spinning til found
 void schedule() {
     lock();
-
     thread *cur_thread = get_current();
-    do {
-        cur_thread = cur_thread->next;
-    } while (cur_thread == run_queue);
+    do { cur_thread = cur_thread->next; } while (cur_thread == run_queue || cur_thread->iszombie);
     unlock();
 
     // context switch (defined in asm)
     // pass both thread's addr as base addr, to load/store the registers
+    // uart_sendline("curr pid: %d, next pid: %d\n", get_current()->pid, cur_thread->pid); // FIXME
     switch_to(get_current(), cur_thread);
+    // uart_sendline("scheduling\n"); // FIXME
 }
 
 void idle() {
     while (1) {
+        // uart_sendline("idle\n"); // FIXME
         kill_zombie();
         schedule();
     };
@@ -117,7 +116,9 @@ void thread_exit() {
     lock();
     get_current()->iszombie = 1;
     unlock();
+    uart_sendline("exit ok\n"); // FIXME
     schedule();
+    uart_sendline("exit ok\n"); // FIXME
 }
 
 void kill_zombie() {
@@ -127,7 +128,11 @@ void kill_zombie() {
             // remove from list
             cur->next->prev = cur->prev;
             cur->prev->next = cur->next;
-            // lab6 remove vm tables
+            // lab6
+            // BUG: diff with sample
+            mmu_free_page_tables(cur->context.pgd, 0); // remove vm tables
+            uart_sendline("zombie: %d\n", cur->pid);   // FIXME
+            mmu_del_vma(cur);                          // remove vma_list
             // release memory
             kfree(cur->kernel_stack_ptr);
             kfree(cur->user_stack_ptr);
@@ -141,11 +146,44 @@ void kill_zombie() {
 
 // for video player
 void thread_exec(char *code, unsigned int codesize) {
-    thread *t = thread_create(code);
-    t->codesize = codesize;
-    t->code = kmalloc(codesize);
-    memcpy(t->code, code, codesize);
-    t->context.lr = (unsigned long)t->code;
+    thread *t = thread_create(code, codesize);
+    memcpy(t->code, code, codesize); // copy code content to thread's mem in user space
+    uart_sendline("img addr: %x\n", t->code);
+
+    // VM approach (using 'KADDR_TO_UADDR' to make the addr in user memory)
+    mmu_add_vma(t, USER_KERNEL_BASE, codesize, (size_t)KADDR_TO_UADDR(t->code), 0b111, 1);                          // space for store code
+    mmu_add_vma(t, USER_STACK_TOP - USTACK_SIZE, USTACK_SIZE, (size_t)KADDR_TO_UADDR(t->user_stack_ptr), 0b111, 1); // space for user stack
+    mmu_add_vma(t, PERIPHERAL_START, PERIPHERAL_END - PERIPHERAL_START, PERIPHERAL_START, 0b011, 0);                // space for peripheral memory
+    // BUG: trans 'signal handler wrapper' addr to user (0x0000 ....), but there is no such code in that place
+    mmu_add_vma(t, USER_SIGNAL_WRAPPER_VA, 0x2000, (size_t)KADDR_TO_UADDR(signal_handler_wrapper), 0b101, 0);
+
+    for (vm_area_struct *it = t->vma_list.next; it != &t->vma_list; it = it->next) {
+        uart_sendline("node at %x:\n", it);                      // FIXME
+        uart_sendline("next: %x\n", it->next);                   // FIXME
+        uart_sendline("prev: %x\n", it->prev);                   // FIXME
+        uart_sendline("virt: %x\n", it->virt_addr);              // FIXME
+        uart_sendline("phys: %x\n", it->phys_addr);              // FIXME
+        uart_sendline("size: %x\n", it->area_size);              // FIXME
+        uart_sendline("xwr: %d\n", it->xwr);                     // FIXME
+        uart_sendline("is allocated: %d\n\n", it->is_allocated); // FIXME
+    }
+
+    // BUG: diff with sample, didnt mov pgd to user space
+    t->context.sp = USER_STACK_TOP;
+    t->context.fp = USER_STACK_TOP;
+    t->context.lr = USER_KERNEL_BASE;
+    // t->context.pgd = KADDR_TO_UADDR(t->context.pgd);
+    uart_sendline("pid: %d\n", t->pid);               // FIXME
+    uart_sendline("elr: %x\n", t->context.lr);        // FIXME
+    uart_sendline("ttbr0_el1: %x\n", t->context.pgd); // FIXME
+
+    // vm related setup
+    asm volatile("dsb ish");                                 // memory barrier
+    asm volatile("msr ttbr0_el1, %0" ::"r"(t->context.pgd)); // load thread's pgd
+    asm volatile("tlbi vmalle1is");                          // flush all TLB (?)
+    asm volatile("dsb ish");                                 // memory barrier
+    asm volatile("isb");                                     // clear pipeline
+
     // basic EL switch setup
     asm volatile("msr tpidr_el1, %0;" ::"r"(&t->context));                // hold the "kernel(el1)" thread structure info
     asm volatile("msr elr_el1, %0;" ::"r"(t->context.lr));                // set exception return addr to 'c_filedata'
@@ -153,21 +191,17 @@ void thread_exec(char *code, unsigned int codesize) {
     asm volatile("msr sp_el0, %0;" ::"r"(t->context.sp));                 //
     asm volatile("mov sp, %0;" ::"r"(t->kernel_stack_ptr + KSTACK_SIZE)); // set el0's sp to top of new stack
 
-    // vm related setup
-    // TODO: find out param in mmu_add_vma mean
+    // switch !!
     add_timer(schedule_timer, "", getTimerFreq());
-    asm volatile("eret;"); // switch EL to 0
+    asm volatile("eret"); // switch EL to 0
 }
 
-void schedule_timer() {
-    add_timer(schedule_timer, "re-schedule", getTimerFreq() >> 5);
-}
+void schedule_timer() { add_timer(schedule_timer, "re-schedule", getTimerFreq() >> 5); }
 
 void foo() {
     for (int i = 0; i < 10; ++i) {
         uart_sendline("Thread id: %d %d\n", get_current()->pid, i);
-        for (int j = 0; j < 1000000; j++)
-            asm volatile("nop\n\t");
+        for (int j = 0; j < 1000000; j++) asm volatile("nop\n\t");
         schedule();
     }
     thread_exit();
