@@ -10,11 +10,11 @@ _start:
 
 setup_mmu_config:
     mrs         x1, sctlr_el1
-    bic         x1, x1, 0x1000 // disable instruction cache, bit[12]
-    bic         x1, x1, 0x4 //disable data cache
+    bic         x1, x1, 0x1000  // disable instruction cache, bit[12]
+    bic         x1, x1, 0x4     //disable data cache
 
     // translation control register (TCR), paging is configured by TCR
-    // set paging configuration (up : 0xffff000000000000 low : 0x0000000000000000)
+    // set paging configuration (up : 0xffff 0000 0000 0000 low : 0x0000 0000 0000 0000)
     ldr         x4, = TCR_CONFIG_DEFAULT
     msr         tcr_el1, x4
 
@@ -31,18 +31,18 @@ setup_mmu_config:
     // setup PGD
     ldr         x2, = BOOT_PGD_ATTR // x2 = 0b11
     orr         x2, x1, x2          // combine the physical address of next level page with attribute.
-    str         x2, [x4]            // *(MMU_PGD_ADDR) = MMU_PUD_ADDR | 0b11
+    str         x2, [x4]            // PGD[0] = &PUD | 0b11
 
     // setup PUD
     ldr         x2, = BOOT_PUD_ATTR
-    // The first page of PUD maps 0x00000000 - 0x3fffffff (RAM and GPU peripherals)
+    // The first page of PUD maps 0x0000 0000 - 0x3fff ffff (RAM and GPU peripherals)
     mov         x3, 0x00000000
-    orr         x3, x2, x3          // *(MMU_PUD_ADDR) = 0x00000000 | BOOT_PUD_ATTR
-    str         x3, [x1]            // 1st 1GB mapped by the 1st entry of PUD
+    orr         x3, x2, x3          // *(MMU_PUD_ADDR) = 0x0000 0000 | BOOT_PUD_ATTR
+    str         x3, [x1]            // PUD[0] = 0x0000 0000 (1GB)
     // The second page of PUD maps 0x40000000 - 0x7fffffff (ARM local peripherals).
     mov         x3, 0x40000000
     orr         x3, x2, x3          // *(MMU_PUD_ADDR + 8) = 0x40000000 | BOOT_PUD_ATTR
-    str         x3, [x1, 8]         // 2nd 1GB mapped by the 2nd entry of PUD
+    str         x3, [x1, 8]         // PUD[1] = 0x4000 0000 (1GB)
 
     // Map the Kernel Space
     // load the identity paging's PGD to 'ttbr1_el1', use indirect branch to virtual address, then run kernel in upper address space.

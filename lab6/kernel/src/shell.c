@@ -380,7 +380,7 @@ void do_cmd_thread_test() {
 }
 
 void do_cmd_syscall_test() {
-    thread_create(fork_test, 0x1000);
+    thread_create(fork_test, 0x4000);
     idle();
 }
 

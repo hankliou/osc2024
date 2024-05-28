@@ -84,7 +84,7 @@ thread *thread_create(void *func, size_t codesize) {
 void from_el1_to_el0(thread *t) {
     asm volatile("msr tpidr_el1, %0" ::"r"(&t->context)); // hold the kernel(el1) thread structure info
     asm volatile("msr elr_el1, lr");                      // get back to caller function
-    asm volatile("msr spsr_el1, %0" ::"r"(0x340));        // disable 'EAF' in E A I F
+    asm volatile("msr spsr_el1, %0" ::"r"(0x0));          // enable INT
     asm volatile("msr sp_el0, %0" ::"r"(t->context.sp));
     asm volatile("mov sp, %0" ::"r"(t->kernel_stack_ptr + KSTACK_SIZE));
     asm volatile("eret");

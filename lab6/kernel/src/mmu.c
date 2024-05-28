@@ -20,15 +20,15 @@ void *set_2M_kernel_mmu(void *x0) {
     unsigned long *pte_table2 = (unsigned long *)(MMU_PTE_ADDR + 0x1000L);
 
     for (int i = 0; i < 512; i++) {
-        unsigned long addr = 0x200000L * i; // 0x20_0000 = 2MB
+        unsigned long offset = 0x200000L * i; // 0x20_0000 = 2MB
 
         // if addr exceed peripheral end, it belongs to device memory
-        if (addr >= PERIPHERAL_END) {
-            pte_table1[i] = (0x0 + addr) + BOOT_PTE_ATTR_nGnRnE;
+        if (offset >= PERIPHERAL_END) {
+            pte_table1[i] = (0x0 + offset) + BOOT_PTE_ATTR_nGnRnE;
             continue;
         }
-        pte_table1[i] = (0x00000000 + addr) | BOOT_PTE_ATTR_NOCACHE; // 0*2MB
-        pte_table2[i] = (0x40000000 + addr) | BOOT_PTE_ATTR_NOCACHE; // 512*2MB
+        pte_table1[i] = (0x00000000 + offset) | BOOT_PTE_ATTR_NOCACHE; // 0*2MB
+        pte_table2[i] = (0x40000000 + offset) | BOOT_PTE_ATTR_NOCACHE; // 512*2MB
     }
 
     // setup PUD entry(1GB), make it point to PTE entry(2MB)
@@ -60,7 +60,7 @@ void map_page(size_t *user_pgd_ptr, size_t va, size_t pa, size_t flag) {
         if (!table[idx]) {
             size_t *new_table = kmalloc(0x1000);                                 // create table, kmalloc will return virt addr
             memset(new_table, 0, 0x1000);                                        // clear bits
-            table[idx] = KADDR_TO_UADDR((size_t)new_table);                      // pointer to next table
+            table[idx] = (size_t)new_table;                                      // pointer to next table
             table[idx] |= PD_ACCESS | PD_TABLE | (MAIR_IDX_NORMAL_NOCACHE << 2); // flags, bits[4:2] is the index to MAIR
         }
 
