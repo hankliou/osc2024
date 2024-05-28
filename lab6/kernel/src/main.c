@@ -13,7 +13,7 @@ char input_buffer[CMD_MAX_LEN];
 void main(char *arg) {
     uart_init();
 
-    dtb_ptr = UADDR_TO_KADDR(arg);
+    dtb_ptr = PHYS2VIRT(arg);
     traverse_device_tree(dtb_ptr, dtb_callback_initramfs);
     uart_sendline("Loading dtb from: 0x%x\n", dtb_ptr);
 

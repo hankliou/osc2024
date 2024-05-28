@@ -62,6 +62,7 @@ void timer_handler() {
         set_timer_interrupt_by_tick(timer_head->next->interrupt_time);
     else
         set_timer_interrupt(99999);
+    timer_enable_interrupt();
 }
 
 // timeout: set next [timeout] cycles for times up
@@ -86,16 +87,13 @@ void add_timer(void *callback, char *msg, unsigned long long timeout) {
         }
     }
     // if node time is longest, put it in last pos
-    if (it == timer_head)
-        timer_list_insert_front(node, timer_head);
+    if (it == timer_head) timer_list_insert_front(node, timer_head);
 
     // set tick
     set_timer_interrupt_by_tick(timer_head->next->interrupt_time);
 }
 
-void timer_print_msg(char *msg) {
-    uart_sendline("%s\n", msg);
-}
+void timer_print_msg(char *msg) { uart_sendline("%s\n", msg); }
 
 // set timer [expire_time] from now (abs)
 void set_timer_interrupt(unsigned long long expire_time) {
@@ -104,9 +102,7 @@ void set_timer_interrupt(unsigned long long expire_time) {
     asm volatile("msr cntp_cval_el0, x1\n\t");
 }
 
-void set_timer_interrupt_by_tick(unsigned long long time) {
-    asm volatile("msr cntp_cval_el0, %0" ::"r"(time));
-}
+void set_timer_interrupt_by_tick(unsigned long long time) { asm volatile("msr cntp_cval_el0, %0" ::"r"(time)); }
 
 long long int getTimerFreq() {
     long long int tick;

@@ -132,10 +132,10 @@ void dtb_callback_initramfs(uint32_t node_type, char *name, void *value, uint32_
     // linux,initrd-start will be assigned by start.elf based on config.txt
     if (node_type == FDT_PROP && strcmp(name, "linux,initrd-start") == 0) {
         // get initramfs's address, then store it into CPIO_DEFAULT_START
-        CPIO_DEFAULT_START = (void *)(unsigned long long)UADDR_TO_KADDR(uint32_endian_big2little(*(uint32_t *)value));
+        CPIO_DEFAULT_START = (void *)(unsigned long long)PHYS2VIRT(uint32_endian_big2little(*(uint32_t *)value));
     }
     if (node_type == FDT_PROP && strcmp(name, "linux,initrd-end") == 0) {
-        CPIO_DEFAULT_END = (void *)(unsigned long long)UADDR_TO_KADDR(uint32_endian_big2little(*(uint32_t *)value));
+        CPIO_DEFAULT_END = (void *)(unsigned long long)PHYS2VIRT(uint32_endian_big2little(*(uint32_t *)value));
     }
 }
 
@@ -153,8 +153,8 @@ void dtb_get_reserved_memory() {
 
     // reserve dtb-defined memory segment
     while (addr_ptr->address != 0 || addr_ptr->size != 0) {
-        unsigned long long start = UADDR_TO_KADDR(uint64_endian_big2little(addr_ptr->address));
-        unsigned long long end = UADDR_TO_KADDR(uint64_endian_big2little(addr_ptr->address + addr_ptr->size));
+        unsigned long long start = PHYS2VIRT(uint64_endian_big2little(addr_ptr->address));
+        unsigned long long end = PHYS2VIRT(uint64_endian_big2little(addr_ptr->address + addr_ptr->size));
         memory_reserve(start, end);
         addr_ptr++;
     }

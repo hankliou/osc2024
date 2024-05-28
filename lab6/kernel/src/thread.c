@@ -47,15 +47,13 @@ thread *thread_create(void *func, size_t codesize) {
     // init property of 'the_thread'
     the_thread->iszombie = 0;
     the_thread->isused = 1;
+    the_thread->context.lr = (unsigned long long)func;
+    the_thread->user_stack_ptr = kmalloc(USTACK_SIZE);
+    the_thread->kernel_stack_ptr = kmalloc(KSTACK_SIZE);
     the_thread->codesize = codesize;
     the_thread->code = kmalloc(codesize);
-    the_thread->user_stack_ptr = kmalloc(USTACK_SIZE);
-    // uart_sendline("ustack allocate: 0x%x\n", the_thread->user_stack_ptr);
-    the_thread->kernel_stack_ptr = kmalloc(KSTACK_SIZE);
-    // uart_sendline("kstack allocate: 0x%x\n", the_thread->kernel_stack_ptr);
-    the_thread->context.lr = (unsigned long)func;
     // sp init to the top of allocated stack area
-    the_thread->context.sp = (unsigned long)the_thread->user_stack_ptr + USTACK_SIZE;
+    the_thread->context.sp = (unsigned long long)the_thread->user_stack_ptr + USTACK_SIZE;
     the_thread->context.fp = the_thread->context.sp; // fp is the base addr, sp won't upper than fp
 
     // signal
@@ -106,7 +104,6 @@ void schedule() {
 
 void idle() {
     while (1) {
-        // uart_sendline("idle\n"); // FIXME
         kill_zombie();
         schedule();
     };
@@ -116,9 +113,7 @@ void thread_exit() {
     lock();
     get_current()->iszombie = 1;
     unlock();
-    uart_sendline("exit ok\n"); // FIXME
     schedule();
-    uart_sendline("exit ok\n"); // FIXME
 }
 
 void kill_zombie() {
@@ -128,16 +123,15 @@ void kill_zombie() {
             // remove from list
             cur->next->prev = cur->prev;
             cur->prev->next = cur->next;
+
             // lab6
-            // BUG: diff with sample
             mmu_free_page_tables(cur->context.pgd, 0); // remove vm tables
-            uart_sendline("zombie: %d\n", cur->pid);   // FIXME
             mmu_del_vma(cur);                          // remove vma_list
-            // release memory
-            kfree(cur->kernel_stack_ptr);
+
+            kfree(cur->kernel_stack_ptr); // release memory
             kfree(cur->user_stack_ptr);
-            // update thread status
-            cur->isused = 0;
+
+            cur->isused = 0; // update thread status
             cur->iszombie = 0;
         }
     }
@@ -148,34 +142,33 @@ void kill_zombie() {
 void thread_exec(char *code, unsigned int codesize) {
     thread *t = thread_create(code, codesize);
     memcpy(t->code, code, codesize); // copy code content to thread's mem in user space
-    uart_sendline("img addr: %x\n", t->code);
 
-    // VM approach (using 'KADDR_TO_UADDR' to make the addr in user memory)
-    mmu_add_vma(t, USER_KERNEL_BASE, codesize, (size_t)KADDR_TO_UADDR(t->code), 0b111, 1);                          // space for store code
-    mmu_add_vma(t, USER_STACK_TOP - USTACK_SIZE, USTACK_SIZE, (size_t)KADDR_TO_UADDR(t->user_stack_ptr), 0b111, 1); // space for user stack
-    mmu_add_vma(t, PERIPHERAL_START, PERIPHERAL_END - PERIPHERAL_START, PERIPHERAL_START, 0b011, 0);                // space for peripheral memory
-    // BUG: trans 'signal handler wrapper' addr to user (0x0000 ....), but there is no such code in that place
-    mmu_add_vma(t, USER_SIGNAL_WRAPPER_VA, 0x2000, (size_t)KADDR_TO_UADDR(signal_handler_wrapper), 0b101, 0);
+    // VM approach (using 'VIRT2PHYS' to make the addr in user memory)
+    mmu_add_vma(t, USER_KERNEL_BASE, codesize, (size_t)VIRT2PHYS(t->code), 0b111, 1);                          // space for store code
+    mmu_add_vma(t, USER_STACK_TOP - USTACK_SIZE, USTACK_SIZE, (size_t)VIRT2PHYS(t->user_stack_ptr), 0b111, 1); // space for user stack
+    mmu_add_vma(t, PERIPHERAL_START, PERIPHERAL_END - PERIPHERAL_START, PERIPHERAL_START, 0b011, 0);           // space for peripheral memory
+    mmu_add_vma(t, USER_SIGNAL_WRAPPER_VA, 0x2000, (size_t)VIRT2PHYS(signal_handler_wrapper), 0b101, 0);       // kernel code is directly mapped
 
-    for (vm_area_struct *it = t->vma_list.next; it != &t->vma_list; it = it->next) {
-        uart_sendline("node at %x:\n", it);                      // FIXME
-        uart_sendline("next: %x\n", it->next);                   // FIXME
-        uart_sendline("prev: %x\n", it->prev);                   // FIXME
-        uart_sendline("virt: %x\n", it->virt_addr);              // FIXME
-        uart_sendline("phys: %x\n", it->phys_addr);              // FIXME
-        uart_sendline("size: %x\n", it->area_size);              // FIXME
-        uart_sendline("xwr: %d\n", it->xwr);                     // FIXME
-        uart_sendline("is allocated: %d\n\n", it->is_allocated); // FIXME
-    }
+    // FIXME: print debug
+    // for (vm_area_struct *it = t->vma_list.next; it != &t->vma_list; it = it->next) {
+    //     uart_sendline("node at %x:\n", it);
+    //     uart_sendline("next: %x\n", it->next);
+    //     uart_sendline("prev: %x\n", it->prev);
+    //     uart_sendline("virt: %x\n", it->virt_addr);
+    //     uart_sendline("phys: %x\n", it->phys_addr);
+    //     uart_sendline("size: %x\n", it->area_size);
+    //     uart_sendline("xwr: %d\n", it->xwr);
+    //     uart_sendline("is allocated: %d\n\n", it->is_allocated);
+    // }
 
-    // BUG: diff with sample, didnt mov pgd to user space
+    t->context.pgd = VIRT2PHYS(t->context.pgd);
     t->context.sp = USER_STACK_TOP;
     t->context.fp = USER_STACK_TOP;
     t->context.lr = USER_KERNEL_BASE;
-    // t->context.pgd = KADDR_TO_UADDR(t->context.pgd);
-    uart_sendline("pid: %d\n", t->pid);               // FIXME
-    uart_sendline("elr: %x\n", t->context.lr);        // FIXME
-    uart_sendline("ttbr0_el1: %x\n", t->context.pgd); // FIXME
+
+    // uart_sendline("pid: %d\n", t->pid);               // FIXME
+    // uart_sendline("elr: %x\n", t->context.lr);        // FIXME
+    // uart_sendline("ttbr0_el1: %x\n", t->context.pgd); // FIXME
 
     // vm related setup
     asm volatile("dsb ish");                                 // memory barrier

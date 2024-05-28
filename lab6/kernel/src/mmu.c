@@ -40,19 +40,13 @@ void *set_2M_kernel_mmu(void *x0) {
 
 void map_page(size_t *user_pgd_ptr, size_t va, size_t pa, size_t flag) {
     size_t *table = user_pgd_ptr;
-
-    // 0      1      2      3
-    // pgd -> pud -> pmd -> pte -> phy
     for (int level = 0; level < 4; level++) {
-        uart_sendline("TABLE: %d\n", level); // FIXME
         // get the address chunk
         unsigned int idx = (va >> (39 - 9 * level)) & 0x1ff;
         // pte will return physical addr
         if (level == 3) {
             table[idx] = pa;
-            // BUG: PD_TABLE should used only in middle tables
-            // table[idx] |= PD_ACCESS | PD_TABLE | (MAIR_IDX_NORMAL_NOCACHE << 2) | PD_PXN | flag; // el0 only
-            table[idx] |= PD_ACCESS | (MAIR_IDX_NORMAL_NOCACHE << 2) | PD_PXN | flag; // el0 only
+            table[idx] |= PD_ACCESS | PD_TABLE | (MAIR_IDX_NORMAL_NOCACHE << 2) | PD_PXN | flag; // el0 only
             return;
         }
 
@@ -60,7 +54,7 @@ void map_page(size_t *user_pgd_ptr, size_t va, size_t pa, size_t flag) {
         if (!table[idx]) {
             size_t *new_table = kmalloc(0x1000);                                 // create table, kmalloc will return virt addr
             memset(new_table, 0, 0x1000);                                        // clear bits
-            table[idx] = (size_t)new_table;                                      // pointer to next table
+            table[idx] = VIRT2PHYS((size_t)new_table);                           // pointer to next table
             table[idx] |= PD_ACCESS | PD_TABLE | (MAIR_IDX_NORMAL_NOCACHE << 2); // flags, bits[4:2] is the index to MAIR
         }
 
@@ -91,14 +85,13 @@ void map_page(size_t *user_pgd_ptr, size_t va, size_t pa, size_t flag) {
         */
         // bits[47:n] is the physical address the entry point to.
         // By above table, flags bits will not affect 'table' to iter to next level and looking up
-        table = (size_t *)UADDR_TO_KADDR((size_t)(table[idx] & ENTRY_ADDR_MASK)); // iter to next table
+        table = (size_t *)PHYS2VIRT((size_t)(table[idx] & ENTRY_ADDR_MASK)); // iter to next table
     }
 }
 
 void mmu_add_vma(thread *t, size_t va, size_t size, size_t pa, size_t xwr, int is_allocated) {
     // alignent
     size = size % 0x1000 ? size + (0x1000 - (size % 0x1000)) : size;
-
     // init node
     vm_area_struct *mem = kmalloc(sizeof(vm_area_struct));
     mem->xwr = xwr;
@@ -112,13 +105,14 @@ void mmu_add_vma(thread *t, size_t va, size_t size, size_t pa, size_t xwr, int i
     mem->prev = t->vma_list.prev;
     mem->next->prev = mem;
     mem->prev->next = mem;
+    uart_sendline("mmu add vma paddr: %x\n", mem->phys_addr);
 }
 
 // remove thread's private vma list
 void mmu_del_vma(thread *t) {
     vm_area_struct *it = t->vma_list.next;
     while (it != &t->vma_list) {
-        if (it->is_allocated) kfree((void *)UADDR_TO_KADDR(it->phys_addr));
+        if (it->is_allocated) kfree((void *)PHYS2VIRT(it->phys_addr));
         it = it->next;   // iter first
         kfree(it->prev); // del current node
     }
@@ -136,24 +130,22 @@ void mmu_map_pages(size_t *pgd_ptr, size_t va, size_t size, size_t pa, size_t fl
 
 // recursively remove entry in thread's private pgd
 void mmu_free_page_tables(size_t *page_table, int level) {
-    // BUG: force trans type to 'size_t' instead of 'char*'
-    // BUG: diff with sample, pgd is set in kernel space, no need to add 0xffff ....
-    // size_t *table_virt = (size_t *)UADDR_TO_KADDR((size_t)page_table);
-    size_t *table_virt = (size_t *)page_table;
-    uart_sendline("free table\n"); // FIXME
+    // BUG: diff with sample, force trans type to 'size_t' instead of 'char*'
+    size_t *table_virt = (size_t *)PHYS2VIRT((char *)page_table);
+
     // traverse all entry in table
     for (int i = 0; i < 512; i++) {
         if (table_virt[i] != 0) {                                             // if entry points to table or page
             size_t *next_table = (size_t *)(table_virt[i] & ENTRY_ADDR_MASK); // addr points to next level table
             if (table_virt[i] & PD_TABLE) {                                   // if current entry points to a table, not a phys addr
 
-                // BUG: != 2
+                // BUG: diff with sample, != 2
                 if (level < 3)                                   // if not PMD
                     mmu_free_page_tables(next_table, level + 1); // free it !
                 table_virt[i] = 0L;                              // reset val
 
                 // BUG: force trans type to 'size_t' instead of 'char*'
-                kfree((void *)UADDR_TO_KADDR((size_t)next_table));
+                kfree((void *)PHYS2VIRT((size_t)next_table));
             }
         }
     }
@@ -164,19 +156,18 @@ void mmu_memfail_abort_handler(esr_el1 *esr) {
     // far_el1 store faulting 'virtual addr', data abort, PC alignment fault, watch point exception taken to EL1
     unsigned long long far_el1; // fault address register
     asm volatile("mrs %0, far_el1" : "=r"(far_el1));
-    uart_sendline("far_el1: %x\n", far_el1); // FIXME
+    uart_sendline("far_el1: %x\n", far_el1);
 
     // search virt addr in va_list
     thread *cur_thread = get_current();
     vm_area_struct *memory = 0;
     for (vm_area_struct *it = cur_thread->vma_list.next; it != &cur_thread->vma_list; it = it->next) {
-        uart_sendline("node at %x\n", it);                 // FIXME
-        uart_sendline("it virtaddr: %x\n", it->virt_addr); // BUG: invalid exception [4], esr_el1: 96000004, elr_el1: FFFF000000082930
-        uart_sendline("it areasize: %d\n", it->area_size); // FIXME
         // far_el1 is inside any node in vma_list
         if (it->virt_addr <= far_el1 && far_el1 <= it->virt_addr + it->area_size) {
+            uart_sendline("it virtaddr: %x ~ %x\n", it->virt_addr,
+                          it->virt_addr + it->area_size); // BUG: invalid exception [4], esr_el1: 96000004, elr_el1: FFFF000000082838
             memory = it;
-            uart_sendline("page found\n"); // FIXME
+            uart_sendline("page found, it 0x%x, mem 0x%x\n", it, memory); // FIXME
             break;
         }
     }
@@ -205,11 +196,11 @@ void mmu_memfail_abort_handler(esr_el1 *esr) {
         size_t xwr_flag = 0;
         if ((memory->xwr & 0b100) == 0) xwr_flag |= PD_UXN;       // non executable
         if ((memory->xwr & 0b010) == 0) xwr_flag |= PD_RDONLY;    // non writeable
-        if ((memory->xwr & 0x001) == 0) xwr_flag |= PD_UK_ACCESS; // non redable
+        if ((memory->xwr & 0x001) == 1) xwr_flag |= PD_UK_ACCESS; // non redable
 
-        map_page(cur_thread->context.pgd, memory->virt_addr + offset, memory->phys_addr + offset, xwr_flag);
+        map_page(PHYS2VIRT(cur_thread->context.pgd), memory->virt_addr + offset, memory->phys_addr + offset, xwr_flag);
     } else {
-        uart_sendline("[Segmentation Fault] killing process\n");
+        uart_sendline("[Segmentation Fault] killing process (else)\n");
         thread_exit();
     }
     uart_sendline("handle finish\n"); // FIXME

@@ -87,7 +87,7 @@ void allocator_init() {
     uart_sendline("[Start up allocation]\n");
     uart_sendline("\nSpin tables & DTB:");
     dtb_get_reserved_memory(); // spin tables and dtb itself
-    memory_reserve(UADDR_TO_KADDR(MMU_PGD_ADDR), UADDR_TO_KADDR(MMU_PTE_ADDR + 0x2000));
+    memory_reserve(PHYS2VIRT(MMU_PGD_ADDR), PHYS2VIRT(MMU_PTE_ADDR + 0x2000));
     uart_sendline("\n_start ~ _end:");
     memory_reserve((unsigned long long)&_start, (unsigned long long)&_end); // kernel image (stack, heap included)
     uart_sendline("\nCPIO_DEFAULT_START ~ CPIO_DEFAULT_END:");

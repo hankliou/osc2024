@@ -28,7 +28,7 @@ void add_irq_task(void *callback, unsigned priority);
 
 // https://github.com/Tekki/raspberrypi-documentation/blob/master/hardware/raspberrypi/bcm2836/QA7_rev3.4.pdf
 // p16
-#define CORE0_INTERRUPT_SOURCE ((volatile unsigned int *)(UADDR_TO_KADDR(0x40000060)))
+#define CORE0_INTERRUPT_SOURCE ((volatile unsigned int *)(PHYS2VIRT(0x40000060)))
 
 #define INTERRUPT_SOURCE_CNTPNSIRQ                                                                                                                   \
     (1 << 1) // physical non-secure, interrupt, counter. often use for physical

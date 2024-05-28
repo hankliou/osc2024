@@ -40,14 +40,14 @@ void el0_sync_router(trap_frame *tpf) {
     asm volatile("mrs %0, esr_el1" : "=r"(esr_reg));
     esr_el1 *esr = (esr_el1 *)&esr_reg; // set a ptr point to the addr of 'esr_reg' to segment its field
     if (esr->ec == MEMFAIL_DATA_ABORT_LOWER || esr->ec == MEMFAIL_INST_ABORT_LOWER) {
-        uart_sendline("handling abort\n"); // FIXME
+        uart_sendline("handle mmu issue\n"); // FIXME
         mmu_memfail_abort_handler(esr);
         return;
     }
 
     el1_interrupt_enable();
     int syscall_no = tpf->x8;
-    uart_sendline("syscall: %d\n", syscall_no); // FIXME
+    // uart_sendline("syscall: %d\n", syscall_no); // FIXME
     if (syscall_no == 0) getpid(tpf);
     // 'UART syscall' user have to allocate spaces to x0(buf) theirself
     else if (syscall_no == 1)
@@ -95,7 +95,7 @@ void el1h_irq_router(trap_frame *tpf) {
     else if (*CORE0_INTERRUPT_SOURCE & 0x2) {
         timer_disable_interrupt();
         add_irq_task(timer_handler, TIMER_IRQ_PRIORITY);
-        timer_enable_interrupt();
+        // timer_enable_interrupt();
         // at least two thread running -> schedule for any timer irq
         if (run_queue && run_queue->next && run_queue->next->next != run_queue) schedule();
     }

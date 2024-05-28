@@ -12,8 +12,8 @@ void *kmalloc(unsigned int size);
 void kfree(void *ptr);
 
 // page related
-#define ALLOCATION_BASE (UADDR_TO_KADDR(0x0)) // 0x1000 0000 ~ 0x2000 0000 (byte)
-#define ALLOCATION_END  (UADDR_TO_KADDR(0x3C000000))
+#define ALLOCATION_BASE (PHYS2VIRT(0x0)) // 0x1000 0000 ~ 0x2000 0000 (byte)
+#define ALLOCATION_END  (PHYS2VIRT(0x3C000000))
 // #define ALLOCATION_BASE 0x10000000 // 0x1000 0000 ~ 0x2000 0000 (byte)
 // #define ALLOCATION_END 0x20000000
 #define PAGE_SIZE    0x1000 // 4KB = 0x1000 byte

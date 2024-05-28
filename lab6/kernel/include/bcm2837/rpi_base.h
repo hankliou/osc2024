@@ -3,6 +3,6 @@
 
 #include "rpi_mmu.h"
 
-#define PERIPHERAL_BASE UADDR_TO_KADDR(0x3F000000)
+#define PERIPHERAL_BASE PHYS2VIRT(0x3F000000)
 
 #endif /*_RPI_BASE_H_ */
