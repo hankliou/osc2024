@@ -40,7 +40,6 @@ void el0_sync_router(trap_frame *tpf) {
     asm volatile("mrs %0, esr_el1" : "=r"(esr_reg));
     esr_el1 *esr = (esr_el1 *)&esr_reg; // set a ptr point to the addr of 'esr_reg' to segment its field
     if (esr->ec == MEMFAIL_DATA_ABORT_LOWER || esr->ec == MEMFAIL_INST_ABORT_LOWER) {
-        uart_sendline("handle mmu issue\n"); // FIXME
         mmu_memfail_abort_handler(esr);
         return;
     }
@@ -68,7 +67,6 @@ void el0_sync_router(trap_frame *tpf) {
         signal_register(tpf->x0, (void (*)())(tpf->x1));
     else if (syscall_no == 9)
         signal_kill(tpf->x0, tpf->x1);
-    // else if(syscall_no == 10) getpid(tpf);
     else if (syscall_no == 99)
         signal_return(tpf);
     else {

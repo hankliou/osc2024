@@ -19,7 +19,6 @@ setup_mmu_config:
 
     // Identity Paging
     // 2-level translation, PGD & PUD only. Each entry of PUD points to a 1GB block.
-    // TODO: different with spec !!!!!
     ldr         x4, = MMU_PGD_ADDR // PGD's page frame at 0x1000
     ldr         x1, = MMU_PUD_ADDR // PUD's page frame at 0x2000
 

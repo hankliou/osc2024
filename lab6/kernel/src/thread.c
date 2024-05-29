@@ -66,7 +66,7 @@ thread *thread_create(void *func, size_t codesize) {
     // lab6 vm's init
     the_thread->vma_list.next = &the_thread->vma_list;
     the_thread->vma_list.prev = &the_thread->vma_list;
-    the_thread->context.pgd = kmalloc(0x1000); // BUG: diff with sample, modified back, page table should left in kernel space
+    the_thread->context.pgd = kmalloc(0x1000);
     memset(the_thread->context.pgd, 0, 0x1000);
 
     // add it into run_queue tail
@@ -97,9 +97,7 @@ void schedule() {
 
     // context switch (defined in asm)
     // pass both thread's addr as base addr, to load/store the registers
-    // uart_sendline("curr pid: %d, next pid: %d\n", get_current()->pid, cur_thread->pid); // FIXME
     switch_to(get_current(), cur_thread);
-    // uart_sendline("scheduling\n"); // FIXME
 }
 
 void idle() {
@@ -146,29 +144,13 @@ void thread_exec(char *code, unsigned int codesize) {
     // VM approach (using 'VIRT2PHYS' to make the addr in user memory)
     mmu_add_vma(t, USER_KERNEL_BASE, codesize, (size_t)VIRT2PHYS(t->code), 0b111, 1);                          // space for store code
     mmu_add_vma(t, USER_STACK_TOP - USTACK_SIZE, USTACK_SIZE, (size_t)VIRT2PHYS(t->user_stack_ptr), 0b111, 1); // space for user stack
-    mmu_add_vma(t, PERIPHERAL_START, PERIPHERAL_END - PERIPHERAL_START, PERIPHERAL_START, 0b011, 0);           // space for peripheral memory
-    mmu_add_vma(t, USER_SIGNAL_WRAPPER_VA, 0x2000, (size_t)VIRT2PHYS(signal_handler_wrapper), 0b101, 0);       // kernel code is directly mapped
-
-    // FIXME: print debug
-    // for (vm_area_struct *it = t->vma_list.next; it != &t->vma_list; it = it->next) {
-    //     uart_sendline("node at %x:\n", it);
-    //     uart_sendline("next: %x\n", it->next);
-    //     uart_sendline("prev: %x\n", it->prev);
-    //     uart_sendline("virt: %x\n", it->virt_addr);
-    //     uart_sendline("phys: %x\n", it->phys_addr);
-    //     uart_sendline("size: %x\n", it->area_size);
-    //     uart_sendline("xwr: %d\n", it->xwr);
-    //     uart_sendline("is allocated: %d\n\n", it->is_allocated);
-    // }
+    // mmu_add_vma(t, PERIPHERAL_START, PERIPHERAL_END - PERIPHERAL_START, PERIPHERAL_START, 0b011, 0);           // space for peripheral memory
+    mmu_add_vma(t, USER_SIGNAL_WRAPPER_VA, 0x2000, (size_t)VIRT2PHYS(signal_handler_wrapper), 0b101, 0); // kernel code is directly mapped
 
     t->context.pgd = VIRT2PHYS(t->context.pgd);
     t->context.sp = USER_STACK_TOP;
     t->context.fp = USER_STACK_TOP;
     t->context.lr = USER_KERNEL_BASE;
-
-    // uart_sendline("pid: %d\n", t->pid);               // FIXME
-    // uart_sendline("elr: %x\n", t->context.lr);        // FIXME
-    // uart_sendline("ttbr0_el1: %x\n", t->context.pgd); // FIXME
 
     // vm related setup
     asm volatile("dsb ish");                                 // memory barrier

@@ -34,7 +34,6 @@ void map_page(size_t *virt_pgd_p, size_t va, size_t pa, size_t flag);
 typedef struct thread thread;
 void mmu_add_vma(thread *t, size_t va, size_t size, size_t pa, size_t xwr, int is_allocated);
 void mmu_del_vma(thread *t);
-void mmu_map_pages(size_t *pgd_ptr, size_t va, size_t size, size_t pa, size_t flag);
 void mmu_free_page_tables(size_t *page_table, int level);
 
 void mmu_memfail_abort_handler(esr_el1 *esr);

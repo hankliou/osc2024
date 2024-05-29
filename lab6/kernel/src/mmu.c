@@ -121,16 +121,8 @@ void mmu_del_vma(thread *t) {
     t->vma_list.prev = &t->vma_list;
 }
 
-void mmu_map_pages(size_t *pgd_ptr, size_t va, size_t size, size_t pa, size_t flag) {
-    pa -= pa % 0x1000; // align
-    // map a sequence of 'contiguous' virt_addr to a sequence of 'contiguous' phys_addr
-    // BUG: may currupt when phys memory overlap?
-    for (size_t s = 0; s < size; s += 0x1000) map_page(pgd_ptr, va + s, pa + s, flag);
-}
-
 // recursively remove entry in thread's private pgd
 void mmu_free_page_tables(size_t *page_table, int level) {
-    // BUG: diff with sample, force trans type to 'size_t' instead of 'char*'
     size_t *table_virt = (size_t *)PHYS2VIRT((char *)page_table);
 
     // traverse all entry in table
@@ -139,13 +131,10 @@ void mmu_free_page_tables(size_t *page_table, int level) {
             size_t *next_table = (size_t *)(table_virt[i] & ENTRY_ADDR_MASK); // addr points to next level table
             if (table_virt[i] & PD_TABLE) {                                   // if current entry points to a table, not a phys addr
 
-                // BUG: diff with sample, != 2
-                if (level < 3)                                   // if not PMD
+                if (level < 2)                                   // if is upper table of PMD
                     mmu_free_page_tables(next_table, level + 1); // free it !
                 table_virt[i] = 0L;                              // reset val
-
-                // BUG: force trans type to 'size_t' instead of 'char*'
-                kfree((void *)PHYS2VIRT((size_t)next_table));
+                kfree((void *)PHYS2VIRT((char *)next_table));
             }
         }
     }
@@ -156,7 +145,7 @@ void mmu_memfail_abort_handler(esr_el1 *esr) {
     // far_el1 store faulting 'virtual addr', data abort, PC alignment fault, watch point exception taken to EL1
     unsigned long long far_el1; // fault address register
     asm volatile("mrs %0, far_el1" : "=r"(far_el1));
-    uart_sendline("far_el1: %x\n", far_el1);
+    // uart_sendline("far_el1: %x\n", far_el1);
 
     // search virt addr in va_list
     thread *cur_thread = get_current();
@@ -164,10 +153,7 @@ void mmu_memfail_abort_handler(esr_el1 *esr) {
     for (vm_area_struct *it = cur_thread->vma_list.next; it != &cur_thread->vma_list; it = it->next) {
         // far_el1 is inside any node in vma_list
         if (it->virt_addr <= far_el1 && far_el1 <= it->virt_addr + it->area_size) {
-            uart_sendline("it virtaddr: %x ~ %x\n", it->virt_addr,
-                          it->virt_addr + it->area_size); // BUG: invalid exception [4], esr_el1: 96000004, elr_el1: FFFF000000082838
             memory = it;
-            uart_sendline("page found, it 0x%x, mem 0x%x\n", it, memory); // FIXME
             break;
         }
     }
@@ -176,7 +162,6 @@ void mmu_memfail_abort_handler(esr_el1 *esr) {
     if (!memory) {
         uart_sendline("[Segmentation Fault] killing process\n");
         thread_exit();
-        uart_sendline("kill finish\n"); // FIXME
         return;
     }
 
@@ -203,6 +188,5 @@ void mmu_memfail_abort_handler(esr_el1 *esr) {
         uart_sendline("[Segmentation Fault] killing process (else)\n");
         thread_exit();
     }
-    uart_sendline("handle finish\n"); // FIXME
     return;
 }

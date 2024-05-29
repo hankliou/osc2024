@@ -74,7 +74,6 @@ int exec(trap_frame *tpf, const char *name, char *const argv[]) {
 
     mmu_add_vma(cur_thread, USER_KERNEL_BASE, cur_thread->codesize, (size_t)VIRT2PHYS(cur_thread->code), 0b111, 1);
     mmu_add_vma(cur_thread, USER_STACK_TOP - USTACK_SIZE, USTACK_SIZE, (size_t)VIRT2PHYS(cur_thread->user_stack_ptr), 0b111, 1);
-    mmu_add_vma(cur_thread, PERIPHERAL_START, PERIPHERAL_END - PERIPHERAL_START, PERIPHERAL_START, 0b011, 0);
     mmu_add_vma(cur_thread, USER_SIGNAL_WRAPPER_VA, 0x2000, (size_t)VIRT2PHYS(signal_handler_wrapper), 0b101, 0);
 
     memcpy(cur_thread->code, new_data, cur_thread->codesize);
@@ -170,51 +169,42 @@ void signal_kill(int pid, int signal) {
 }
 
 void signal_return(trap_frame *tpf) {
+    // (no longer needed with virtual memory)
     // free space (there may be some sys call in user-defined handler, when handling, tpf will be update, hance we can get it's sp from tpf)
-    unsigned long long signal_user_stack = tpf->sp_el0 % USTACK_SIZE == 0 ? tpf->sp_el0 - USTACK_SIZE : tpf->sp_el0 & (~(USTACK_SIZE - 1));
-    kfree((char *)signal_user_stack);
+    // unsigned long long signal_user_stack = tpf->sp_el0 % USTACK_SIZE == 0 ? tpf->sp_el0 - USTACK_SIZE : tpf->sp_el0 & (~(USTACK_SIZE - 1));
+    // kfree((char *)signal_user_stack);
 
     // load context
     load_context(&get_current()->signal_savedContext);
 }
 
 /* components */
-unsigned int get_file_size(char *path) {
-    char *filepath, *filedata;
+unsigned int get_file_size(char *thefilepath) {
+    char *filepath;
+    char *filedata;
     unsigned int filesize;
-    struct cpio_newc_header *head = CPIO_DEFAULT_START;
+    struct cpio_newc_header *header_pointer = CPIO_DEFAULT_START;
 
-    // traverse the whole ramdisk, check filename one by one
-    while (head != 0) {
-        int error = cpio_newc_parse_header(head, &filepath, &filesize, &filedata, &head);
-        if (error) {
-            uart_sendline("cpio parse error\n");
-            return -1;
-        }
-        if (strcmp(filepath, path) == 0) return filesize;
-
-        // if TRAILER!!!
-        if (head == 0) uart_sendline("execfile: %s: No such file or directory\n", path);
+    while (header_pointer != 0) {
+        int error = cpio_newc_parse_header(header_pointer, &filepath, &filesize, &filedata, &header_pointer);
+        if (error) break;
+        if (strcmp(thefilepath, filepath) == 0) return filesize;
+        if (header_pointer == 0) uart_sendline("execfile: %s: No such file or directory\r\n", thefilepath);
     }
     return 0;
 }
 
-char *get_file_start(char *path) {
-    char *filepath, *filedata;
+char *get_file_start(char *thefilepath) {
+    char *filepath;
+    char *filedata;
     unsigned int filesize;
-    struct cpio_newc_header *head = CPIO_DEFAULT_START;
+    struct cpio_newc_header *header_pointer = CPIO_DEFAULT_START;
 
-    // traverse the whole ramdisk, check filename one by one
-    while (head != 0) {
-        int error = cpio_newc_parse_header(head, &filepath, &filesize, &filedata, &head);
-        if (error) {
-            uart_sendline("cpio parse error\n");
-            break;
-        }
-        if (strcmp(filepath, path) == 0) return filedata;
-
-        // if TRAILER!!!
-        if (head == 0) uart_sendline("execfile: %s: No such file or directory\n", path);
+    while (header_pointer != 0) {
+        int error = cpio_newc_parse_header(header_pointer, &filepath, &filesize, &filedata, &header_pointer);
+        if (error) break;
+        if (strcmp(thefilepath, filepath) == 0) return filedata;
+        if (header_pointer == 0) uart_sendline("execfile: %s: No such file or directory\r\n", thefilepath);
     }
     return 0;
 }
