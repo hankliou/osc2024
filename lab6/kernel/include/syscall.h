@@ -48,7 +48,7 @@ size_t uart_write(trap_frame *tpf, const char buf[], size_t size);
 int exec(trap_frame *tpf, const char *name, char *const argv[]);
 int fork(trap_frame *tpf);
 void exit(trap_frame *tpf, int status);
-int mbox_call(trap_frame *tpf, unsigned char ch, unsigned int *mbox);
+int syscall_mbox_call(trap_frame *tpf, unsigned char ch, unsigned int *mbox_user);
 void kill(int pid);
 
 void signal_register(int signal, void (*handler)());

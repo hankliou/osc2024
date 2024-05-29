@@ -18,13 +18,12 @@ switch_to: // called with 2 param, (prev, next) = (x0, x1)
     ldp x25, x26, [x1, 16*3]
     ldp x27, x28, [x1, 16*4]
     ldp fp, lr, [x1, 16*5]
-    ldr x9, [x1, 16*6]
+    ldp x9, x0, [x1, 16*6]  // get pgd address
     mov sp, x9
-    msr tpidr_el1, x1 // tpidr_el1 stores starting address of thread's structure
-
-    ldr x9, [x0, 16*6+8]    // get pgd address
+    msr tpidr_el1, x1       // tpidr_el1 stores starting address of thread's structure
+ 
     dsb ish                 // ensure write has completed, lock for context switch
-    msr ttbr0_el1, x9       // switch translation based address.
+    msr ttbr0_el1, x0       // switch translation based address.
     tlbi vmalle1is          // invalidate all TLB entries in stage 1, el1 and inner shareable
     dsb ish                 // ensure completion of TLB invalidatation
     isb                     // clear pipeline

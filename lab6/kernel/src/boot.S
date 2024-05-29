@@ -6,13 +6,8 @@
 
 _start:
     bl          from_el2_to_el1
-    //b           setup_exception_vector_table
 
 setup_mmu_config:
-    mrs         x1, sctlr_el1
-    bic         x1, x1, 0x1000  // disable instruction cache, bit[12]
-    bic         x1, x1, 0x4     //disable data cache
-
     // translation control register (TCR), paging is configured by TCR
     // set paging configuration (up : 0xffff 0000 0000 0000 low : 0x0000 0000 0000 0000)
     ldr         x4, = TCR_CONFIG_DEFAULT

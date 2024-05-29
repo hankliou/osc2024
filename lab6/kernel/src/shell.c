@@ -237,7 +237,7 @@ void do_cmd_info() {
     pt[6] = 0;
     pt[7] = MBOX_TAG_LAST_BYTE;
 
-    if (k_mbox_call(MBOX_TAGS_ARM_TO_VC, (unsigned int)((unsigned long)&pt))) {
+    if (mbox_call(MBOX_TAGS_ARM_TO_VC, (unsigned int)((unsigned long)&pt))) {
         uart_sendline("Hardware Revision\t: ");
         uart_2hex(pt[6]);
         uart_2hex(pt[5]);
@@ -253,7 +253,7 @@ void do_cmd_info() {
     pt[6] = 0;
     pt[7] = MBOX_TAG_LAST_BYTE;
 
-    if (k_mbox_call(MBOX_TAGS_ARM_TO_VC, (unsigned int)((unsigned long)&pt))) {
+    if (mbox_call(MBOX_TAGS_ARM_TO_VC, (unsigned int)((unsigned long)&pt))) {
         uart_sendline("ARM Memory Base Address\t: ");
         uart_2hex(pt[5]);
         uart_sendline("\r\n");

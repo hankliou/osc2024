@@ -1,6 +1,13 @@
 #ifndef _EXPTION_H_
 #define _EXPTION_H_
 
+#include "bcm2837/rpi_irq.h"
+
+#define CORE_INTERRUPT_SOURCE      ((volatile unsigned int *)(PHYS2VIRT(0X40000060)))
+#define IRQ_PENDING_1_AUX_INT      (1 << 29)
+#define INTERRUPT_SOURCE_GPU       (1 << 8)
+#define INTERRUPT_SOURCE_CNTPNSIRQ (1 << 1)
+
 /*
 ARM Peripherals interrupts table
     0: arm timer

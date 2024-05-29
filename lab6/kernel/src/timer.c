@@ -1,4 +1,5 @@
 #include "timer.h"
+#include "exception.h"
 #include "memory.h"
 #include "u_string.h"
 #include "uart1.h"
@@ -44,6 +45,7 @@ void timer_disable_interrupt() {
 }
 
 void timer_handler() {
+    lock();
     timer_node *node = timer_head->next;
     // list not empyt
     if (timer_head->next != timer_head) {
@@ -62,7 +64,8 @@ void timer_handler() {
         set_timer_interrupt_by_tick(timer_head->next->interrupt_time);
     else
         set_timer_interrupt(99999);
-    timer_enable_interrupt();
+    // timer_enable_interrupt(); // mov from timer exception handling
+    unlock();
 }
 
 // timeout: set next [timeout] cycles for times up
@@ -78,6 +81,8 @@ void add_timer(void *callback, char *msg, unsigned long long timeout) {
     node->msg = simple_malloc(strlen(msg) + 1); // need to free when times up(in timer_handler)
     strcpy(node->msg, msg);
 
+    lock();
+
     // insert node into list
     timer_node *it = timer_head->next;
     for (; it != timer_head; it = it->next) {
@@ -91,6 +96,7 @@ void add_timer(void *callback, char *msg, unsigned long long timeout) {
 
     // set tick
     set_timer_interrupt_by_tick(timer_head->next->interrupt_time);
+    unlock();
 }
 
 void timer_print_msg(char *msg) { uart_sendline("%s\n", msg); }

@@ -1,9 +1,11 @@
 #include "syscall.h"
 #include "bcm2837/rpi_mbox.h"
+#include "bcm2837/rpi_mmu.h"
 #include "cpio.h"
 #include "exception.h"
 #include "mbox.h"
 #include "memory.h"
+#include "mmu_constant.h"
 #include "signal.h"
 #include "thread.h"
 #include "u_string.h"
@@ -58,25 +60,28 @@ int exec(trap_frame *tpf, const char *name, char *const argv[]) {
     cur_thread->vma_list.next = &(cur_thread->vma_list);
     cur_thread->vma_list.prev = &(cur_thread->vma_list);
 
-    // BUG: no this segment in lab5
-    // init thread itself code
-    // kfree(cur_thread->code);
     cur_thread->codesize = get_file_size((char *)name);
-    // cur_thread->code = kmalloc(cur_thread->codesize);
-    memcpy(cur_thread->code, get_file_start((char *)name), cur_thread->codesize);
-    // cur_thread->user_stack_ptr = kmalloc(USTACK_SIZE);
+    char *new_data = get_file_start((char *)name);
+    cur_thread->code = kmalloc(cur_thread->codesize);
+    cur_thread->user_stack_ptr = kmalloc(USTACK_SIZE);
 
-    // TODO
-    // asm volatile("dsb ish");                          // memory barrier
-    // mmu_free_page_tables(cur_thread->context.pgd, 0); // empty thread itself pgd
-    // uart_sendline("pgd: %x\n", cur_thread->context.pgd);
-    // memset(phys)
+    asm("dsb ish\n\t"); // ensure write has completed
+    mmu_free_page_tables(cur_thread->context.pgd, 0);
+    memset(PHYS2VIRT(cur_thread->context.pgd), 0, 0x1000);
+    asm("tlbi vmalle1is\n\t" // invalidate all TLB entries
+        "dsb ish\n\t"        // ensure completion of TLB invalidatation
+        "isb\n\t");          // clear pipeline
 
-    // init signal handler
-    for (int i = 0; i <= SIGNAL_MAX; i++) cur_thread->signal_handler[i] = signal_default_handler;
+    mmu_add_vma(cur_thread, USER_KERNEL_BASE, cur_thread->codesize, (size_t)VIRT2PHYS(cur_thread->code), 0b111, 1);
+    mmu_add_vma(cur_thread, USER_STACK_TOP - USTACK_SIZE, USTACK_SIZE, (size_t)VIRT2PHYS(cur_thread->user_stack_ptr), 0b111, 1);
+    mmu_add_vma(cur_thread, PERIPHERAL_START, PERIPHERAL_END - PERIPHERAL_START, PERIPHERAL_START, 0b011, 0);
+    mmu_add_vma(cur_thread, USER_SIGNAL_WRAPPER_VA, 0x2000, (size_t)VIRT2PHYS(signal_handler_wrapper), 0b101, 0);
 
-    tpf->elr_el1 = (unsigned long)cur_thread->code;
-    tpf->sp_el0 = (unsigned long)cur_thread->user_stack_ptr + USTACK_SIZE;
+    memcpy(cur_thread->code, new_data, cur_thread->codesize);
+    for (int i = 0; i <= SIGNAL_MAX; i++) { cur_thread->signal_handler[i] = signal_default_handler; }
+
+    tpf->elr_el1 = USER_KERNEL_BASE;
+    tpf->sp_el0 = USER_STACK_TOP;
     tpf->x0 = 0;
     return 0;
 }
@@ -84,67 +89,67 @@ int exec(trap_frame *tpf, const char *name, char *const argv[]) {
 // return child's id to parent, return 0 to child
 int fork(trap_frame *tpf) {
     lock();
-
-    thread *child = thread_create(get_current()->code, get_current()->codesize); // create new thread
-    thread *parent = get_current();                                              // backup parent thread
-    int parent_id = parent->pid;                                                 // record original pid
-    child->codesize = parent->codesize;                                          // assign size
-    memcpy(child->user_stack_ptr, parent->user_stack_ptr, USTACK_SIZE);          // copy user stack (deep copy)
-    memcpy(child->kernel_stack_ptr, parent->kernel_stack_ptr, KSTACK_SIZE);      // copy kernel stack (deep copy)
+    thread *child = thread_create(get_current()->code, get_current()->codesize);
 
     // copy signal handler
-    for (int i = 0; i <= SIGNAL_MAX; i++) child->signal_handler[i] = parent->signal_handler[i];
+    for (int i = 0; i <= SIGNAL_MAX; i++) { child->signal_handler[i] = get_current()->signal_handler[i]; }
 
-    // before coping context, update parent's context first!!!
-    store_context((thread_context *)get_current()); // mainly storing lr and sp
-
-    // child
-    if (get_current()->pid != parent_id) {
-        // child move it's "tpf" pointer to it's trap_frame
-        tpf = (trap_frame *)((char *)tpf + (child->kernel_stack_ptr - parent->kernel_stack_ptr)); // trap frame in kernel stack
-        // child move it's "user sp" with same offset of it's parent
-        tpf->sp_el0 += child->user_stack_ptr - parent->user_stack_ptr;
-        tpf->x0 = 0;
-        return 0; // jump to link register
+    for (vm_area_struct *vma = &get_current()->vma_list; vma->next != &get_current()->vma_list; vma = vma->next) {
+        // ignore device and signal wrapper
+        if (vma->virt_addr == USER_SIGNAL_WRAPPER_VA || vma->virt_addr == PERIPHERAL_START) { continue; }
+        char *new_alloc = kmalloc(vma->area_size); // alloc a new memory to map VA
+        mmu_add_vma(child, vma->virt_addr, vma->area_size, (size_t)VIRT2PHYS(new_alloc), vma->xwr, 1);
+        memcpy(new_alloc, (void *)PHYS2VIRT(vma->phys_addr), vma->area_size);
     }
+    mmu_add_vma(child, PERIPHERAL_START, PERIPHERAL_END - PERIPHERAL_START, PERIPHERAL_START, 0b011, 0);
+    mmu_add_vma(child, USER_SIGNAL_WRAPPER_VA, 0x2000, (size_t)VIRT2PHYS(signal_handler_wrapper), 0b101, 0);
 
-    // copy parent's context to child
+    int parent_pid = get_current()->pid;
+
+    // copy stack into new process
+    for (int i = 0; i < KSTACK_SIZE; i++) { child->kernel_stack_ptr[i] = get_current()->kernel_stack_ptr[i]; }
+
+    store_context((thread_context *)get_current());
+    // for child
+    if (parent_pid != get_current()->pid) { goto child; }
+
+    void *temp_pgd = child->context.pgd;
     child->context = get_current()->context;
-    // update an offset to child's sp, so after jump with "lr", "sp" will be correct
-    unsigned long long offset = (unsigned long long)(child->kernel_stack_ptr) - (unsigned long long)(parent->kernel_stack_ptr);
-    child->context.fp += offset;
-    child->context.sp += offset;
+    child->context.pgd = VIRT2PHYS(temp_pgd);
+    child->context.fp += child->kernel_stack_ptr - get_current()->kernel_stack_ptr; // move fp
+    child->context.sp += child->kernel_stack_ptr - get_current()->kernel_stack_ptr; // move kernel sp
 
-    tpf->x0 = child->pid; // return child's pid
     unlock();
-    return child->pid; // return child's pid
+    uart_sendline("fork finish\n");
+    tpf->x0 = child->pid;
+    return child->pid;
+
+child:
+    tpf->x0 = 0;
+    return 0;
 }
 
 void exit(trap_frame *tpf, int status) { thread_exit(); }
 
-int mbox_call(trap_frame *tpf, unsigned char ch, unsigned int *mbox) {
+int syscall_mbox_call(trap_frame *tpf, unsigned char ch, unsigned int *mbox_user) {
     lock();
-    unsigned int r = ((unsigned long)mbox & ~0xF) | (ch & 0xF);
-    // Wait until we can write to the mailbox
-    while (*MBOX_STATUS & BCM_ARM_VC_MS_FULL);
-    *MBOX_WRITE = r; // Write the request
-    while (1) {
-        // Wait for the response
-        while (*MBOX_STATUS & BCM_ARM_VC_MS_EMPTY);
-        if (r == *MBOX_READ) {
-            tpf->x0 = (mbox[1] == MBOX_REQUEST_SUCCEED);
-            unlock();
-            return mbox[1] == MBOX_REQUEST_SUCCEED;
-        }
-    }
-    tpf->x0 = 0;
+
+    unsigned int size_of_mbox = mbox_user[0];
+    memcpy((char *)pt, mbox_user, size_of_mbox);
+    mbox_call(MBOX_TAGS_ARM_TO_VC, (unsigned int)((unsigned long)&pt));
+    memcpy(mbox_user, (char *)pt, size_of_mbox);
+
+    tpf->x0 = 8;
     unlock();
     return 0;
 }
 
 void kill(int pid) {
-    if (pid < 0 || pid > PID_MAX || !thread_list[pid].isused) return;
     lock();
+    if (pid < 0 || pid > PID_MAX || !thread_list[pid].isused) {
+        unlock();
+        return;
+    }
     thread_list[pid].iszombie = 1;
     unlock();
     schedule();

@@ -61,7 +61,7 @@ void el0_sync_router(trap_frame *tpf) {
     else if (syscall_no == 5)
         exit(tpf, tpf->x0);
     else if (syscall_no == 6)
-        mbox_call(tpf, (unsigned char)tpf->x0, (unsigned int *)tpf->x1);
+        syscall_mbox_call(tpf, (unsigned char)tpf->x0, (unsigned int *)tpf->x1);
     else if (syscall_no == 7)
         kill(tpf->x0);
     else if (syscall_no == 8)
@@ -79,7 +79,7 @@ void el0_sync_router(trap_frame *tpf) {
 
 void el1h_irq_router(trap_frame *tpf) {
     // uart
-    if (*IRQ_PENDING_1 & (1 << 29)) {
+    if ((*IRQ_PENDING_1 & IRQ_PENDING_1_AUX_INT) && (*CORE0_INTERRUPT_SOURCE & INTERRUPT_SOURCE_GPU)) {
         switch (*AUX_MU_IIR_REG & 0x6) {
         case 0x2: // transmit interrupt
             uart_tx_irq_disable();
@@ -92,29 +92,14 @@ void el1h_irq_router(trap_frame *tpf) {
         }
     }
     // timer
-    else if (*CORE0_INTERRUPT_SOURCE & 0x2) {
+    else if (*CORE0_INTERRUPT_SOURCE & INTERRUPT_SOURCE_CNTPNSIRQ) {
         timer_disable_interrupt();
         add_irq_task(timer_handler, TIMER_IRQ_PRIORITY);
-        // timer_enable_interrupt();
+        timer_enable_interrupt(); // pospond to re-open after handling
         // at least two thread running -> schedule for any timer irq
         if (run_queue && run_queue->next && run_queue->next->next != run_queue) schedule();
     }
-
-    /*  M[3:0]
-
-        0b0000  User
-        0b0001  FIQ
-        0b0010  IRQ
-        0b0011  Supervisor
-        0b0111  Abort
-        0b1011  Undefined
-        0b1111  System
-    */
-    // check if there are signals to be done -> when M[3:0] = 00**
-    // uart_sendline("spsr: %x\n", tpf->spsr_el1);
-    // if ((tpf->spsr_el1 & 0b1100) == 0) {
     check_signal(tpf);
-    // }
 }
 
 void invalid_exception_router(int no) {
@@ -128,7 +113,7 @@ void invalid_exception_router(int no) {
 
 /* implement preemption */
 void irqtask_list_init() {
-    irq_head = simple_malloc(sizeof(irq_node));
+    irq_head = kmalloc(sizeof(irq_node));
     irq_head->next = irq_head;
     irq_head->prev = irq_head;
 }
@@ -150,12 +135,12 @@ void el1_interrupt_disable() {
 
 void add_irq_task(void *callback, unsigned priority) {
     // init node
-    irq_node *node = simple_malloc(sizeof(irq_node));
+    irq_node *node = kmalloc(sizeof(irq_node));
     node->priority = priority;
     node->task_function = callback;
 
     // mask interrupt line
-    el1_interrupt_disable();
+    lock();
 
     // insert node into list
     irq_node *it = irq_head->next;
@@ -169,7 +154,7 @@ void add_irq_task(void *callback, unsigned priority) {
     if (it == irq_head) irq_list_insert_front(node, it);
 
     // unmask interrupt line
-    el1_interrupt_enable();
+    unlock();
 
     // do the task
     while (irq_head->next != irq_head) {
@@ -182,14 +167,14 @@ void add_irq_task(void *callback, unsigned priority) {
             !!!!! be careful using pointer !!!!!
         */
 
-        el1_interrupt_disable();                    // disable interrupt
+        lock();                                     // disable interrupt
         void *task = irq_head->next->task_function; // copy task function
         // remove node
         irq_node *n = irq_head->next;
         irq_head->next = n->next;
         n->next->prev = irq_head;
         free(n);
-        el1_interrupt_enable(); // enable interrupt
+        unlock(); // enable interrupt
 
         // execute event with interrupt enabled
         ((void (*)())task)();

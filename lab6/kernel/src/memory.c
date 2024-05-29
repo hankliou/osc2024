@@ -1,5 +1,6 @@
 #include "memory.h"
 #include "dtb.h"
+#include "exception.h"
 #include "mmu_constant.h"
 #include "uart1.h"
 
@@ -310,21 +311,25 @@ void dump_free_slot_list() {
 }
 
 void *kmalloc(unsigned int size) {
+    lock();
     void *addr;
     if (size > PAGE_SIZE / 2)
         addr = page_malloc(size);
     else
         addr = dynamic_malloc(size);
+    unlock();
     return addr;
 }
 
 void kfree(void *ptr) {
+    lock();
     // if ptr's space in frame array has 'slot_level' attribute, use dynamic free
     frame *the_frame = &frame_array[((unsigned long long)ptr - ALLOCATION_BASE) >> 12];
     if (the_frame->slot_level == NOT_A_SLOT)
         page_free(ptr);
     else
         dynamic_free(ptr);
+    unlock();
 }
 
 // start, end: address (e.g. 0x1234 5678), a frame contains 0x8000 bits !!!
