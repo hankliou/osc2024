@@ -90,7 +90,7 @@ void map_page(size_t *user_pgd_ptr, size_t va, size_t pa, size_t flag) {
 }
 
 void mmu_add_vma(thread *t, size_t va, size_t size, size_t pa, size_t xwr, int is_allocated) {
-    // alignent
+    // aligment
     size = size % 0x1000 ? size + (0x1000 - (size % 0x1000)) : size;
     // init node
     vm_area_struct *mem = kmalloc(sizeof(vm_area_struct));

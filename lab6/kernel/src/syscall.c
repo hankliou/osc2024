@@ -62,6 +62,7 @@ int exec(trap_frame *tpf, const char *name, char *const argv[]) {
 
     cur_thread->codesize = get_file_size((char *)name);
     char *new_data = get_file_start((char *)name);
+    kfree(cur_thread->code);
     cur_thread->code = kmalloc(cur_thread->codesize);
     cur_thread->user_stack_ptr = kmalloc(USTACK_SIZE);
 
@@ -74,6 +75,7 @@ int exec(trap_frame *tpf, const char *name, char *const argv[]) {
 
     mmu_add_vma(cur_thread, USER_KERNEL_BASE, cur_thread->codesize, (size_t)VIRT2PHYS(cur_thread->code), 0b111, 1);
     mmu_add_vma(cur_thread, USER_STACK_TOP - USTACK_SIZE, USTACK_SIZE, (size_t)VIRT2PHYS(cur_thread->user_stack_ptr), 0b111, 1);
+    mmu_add_vma(cur_thread, PERIPHERAL_START, PERIPHERAL_END - PERIPHERAL_START, PERIPHERAL_START, 0b011, 0);
     mmu_add_vma(cur_thread, USER_SIGNAL_WRAPPER_VA, 0x2000, (size_t)VIRT2PHYS(signal_handler_wrapper), 0b101, 0);
 
     memcpy(cur_thread->code, new_data, cur_thread->codesize);
@@ -93,8 +95,9 @@ int fork(trap_frame *tpf) {
     // copy signal handler
     for (int i = 0; i <= SIGNAL_MAX; i++) { child->signal_handler[i] = get_current()->signal_handler[i]; }
 
+    // copy vms
     for (vm_area_struct *vma = &get_current()->vma_list; vma->next != &get_current()->vma_list; vma = vma->next) {
-        // ignore device and signal wrapper
+        // copy device and signal wrapper separately(outside loop)
         if (vma->virt_addr == USER_SIGNAL_WRAPPER_VA || vma->virt_addr == PERIPHERAL_START) { continue; }
         char *new_alloc = kmalloc(vma->area_size); // alloc a new memory to map VA
         mmu_add_vma(child, vma->virt_addr, vma->area_size, (size_t)VIRT2PHYS(new_alloc), vma->xwr, 1);
@@ -110,7 +113,10 @@ int fork(trap_frame *tpf) {
 
     store_context((thread_context *)get_current());
     // for child
-    if (parent_pid != get_current()->pid) { goto child; }
+    if (parent_pid != get_current()->pid) {
+        tpf->x0 = 0;
+        return 0;
+    }
 
     void *temp_pgd = child->context.pgd;
     child->context = get_current()->context;
@@ -122,10 +128,6 @@ int fork(trap_frame *tpf) {
     uart_sendline("fork finish\n");
     tpf->x0 = child->pid;
     return child->pid;
-
-child:
-    tpf->x0 = 0;
-    return 0;
 }
 
 void exit(trap_frame *tpf, int status) { thread_exit(); }
@@ -138,7 +140,7 @@ int syscall_mbox_call(trap_frame *tpf, unsigned char ch, unsigned int *mbox_user
     mbox_call(MBOX_TAGS_ARM_TO_VC, (unsigned int)((unsigned long)&pt));
     memcpy(mbox_user, (char *)pt, size_of_mbox);
 
-    tpf->x0 = 8;
+    tpf->x0 = 1; // return true
     unlock();
     return 0;
 }
