@@ -144,8 +144,8 @@ void thread_exec(char *code, unsigned int codesize) {
     // VM approach (using 'VIRT2PHYS' to make the addr in user memory)
     mmu_add_vma(t, USER_KERNEL_BASE, codesize, (size_t)VIRT2PHYS(t->code), 0b111, 1);                          // space for store code
     mmu_add_vma(t, USER_STACK_TOP - USTACK_SIZE, USTACK_SIZE, (size_t)VIRT2PHYS(t->user_stack_ptr), 0b111, 1); // space for user stack
-    // mmu_add_vma(t, PERIPHERAL_START, PERIPHERAL_END - PERIPHERAL_START, PERIPHERAL_START, 0b011, 0);           // space for peripheral memory
-    mmu_add_vma(t, USER_SIGNAL_WRAPPER_VA, 0x2000, (size_t)VIRT2PHYS(signal_handler_wrapper), 0b101, 0); // kernel code is directly mapped
+    mmu_add_vma(t, PERIPHERAL_START, PERIPHERAL_END - PERIPHERAL_START, PERIPHERAL_START, 0b011, 0);           // space for peripheral memory
+    mmu_add_vma(t, USER_SIGNAL_WRAPPER_VA, 0x2000, (size_t)VIRT2PHYS(signal_handler_wrapper), 0b101, 0);       // kernel code is directly mapped
 
     t->context.pgd = VIRT2PHYS(t->context.pgd);
     t->context.sp = USER_STACK_TOP;
