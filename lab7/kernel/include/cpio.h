@@ -12,7 +12,7 @@
 #define CPIO_NEWC_HEADER_MAGIC "070701" // big endian constant, to check whether it is big endian or little endian
 
 // Using newc archive format
-struct cpio_newc_header {
+typedef struct cpio_newc_header {
     char c_magic[6]; // fixed, "070701".
     char c_ino[8];
     char c_mode[8];
@@ -27,7 +27,7 @@ struct cpio_newc_header {
     char c_rdevminor[8];
     char c_namesize[8];
     char c_check[8];
-};
+} cpio_newc_header;
 
 /* write pathname, data, next header into corresponding parameter*/
 int cpio_newc_parse_header(struct cpio_newc_header *this_header_pointer, char **pathname, unsigned int *filesize, char **data,

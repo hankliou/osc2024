@@ -10,12 +10,13 @@
 #include "timer.h"
 #include "u_string.h"
 #include "uart1.h"
+#include "vfs.h"
 
 extern char *dtb_ptr;
 extern int uart_recv_echo_flag;
 
-void *CPIO_DEFAULT_START; // root of ramfs
-void *CPIO_DEFAULT_END;   // end addressl of ramfs
+extern void *CPIO_DEFAULT_START; // root of ramfs
+extern void *CPIO_DEFAULT_END;   // end addressl of ramfs
 
 struct CLI_CMDS cmd_list[CLI_MAX_CMD] = {
     {.command = "cat", .help = "see the file content"},
@@ -33,6 +34,7 @@ struct CLI_CMDS cmd_list[CLI_MAX_CMD] = {
     {.command = "mem_test", .help = "lazy testing kmalloc and kfree"},
     {.command = "thread_test", .help = "test threads interleaving"},
     {.command = "syscall_test", .help = "test syscall"},
+    {.command = "vfs_test", .help = "test vfs"},
 };
 
 void do_cmd_exec(char *filepath) {
@@ -126,40 +128,25 @@ void cli_cmd_exec(char *buffer) {
         buffer++;
     }
 
-    if (strcmp(cmd, "cat") == 0) {
-        do_cmd_cat(argvs);
-    } else if (strcmp(cmd, "dtb") == 0) {
-        do_cmd_dtb();
-    } else if (strcmp(cmd, "hello") == 0) {
-        do_cmd_hello();
-    } else if (strcmp(cmd, "help") == 0) {
-        do_cmd_help();
-    } else if (strcmp(cmd, "info") == 0) {
-        do_cmd_info();
-    } else if (strcmp(cmd, "simple_malloc") == 0) {
-        do_cmd_simple_malloc();
-    } else if (strcmp(cmd, "ls") == 0) {
-        do_cmd_ls(argvs);
-    } else if (strcmp(cmd, "exec") == 0) {
-        do_cmd_exec(argvs);
-    } else if (strcmp(cmd, "reboot") == 0) {
-        do_cmd_reboot();
-    } else if (strcmp(cmd, "set2sAlert") == 0) {
-        do_cmd_set2sTimer("2s time's up");
-    } else if (strcmp(cmd, "setTimer") == 0) {
+    if (strcmp(cmd, "cat") == 0) do_cmd_cat(argvs);
+    else if (strcmp(cmd, "dtb") == 0) do_cmd_dtb();
+    else if (strcmp(cmd, "hello") == 0) do_cmd_hello();
+    else if (strcmp(cmd, "help") == 0) do_cmd_help();
+    else if (strcmp(cmd, "info") == 0) do_cmd_info();
+    else if (strcmp(cmd, "simple_malloc") == 0) do_cmd_simple_malloc();
+    else if (strcmp(cmd, "ls") == 0) do_cmd_ls(argvs);
+    else if (strcmp(cmd, "exec") == 0) do_cmd_exec(argvs);
+    else if (strcmp(cmd, "reboot") == 0) do_cmd_reboot();
+    else if (strcmp(cmd, "set2sAlert") == 0) do_cmd_set2sTimer("2s time's up");
+    else if (strcmp(cmd, "setTimer") == 0) {
         char *sec = str_SepbySpace(argvs);
         do_cmd_setTimer(argvs, atoi(sec));
-    } else if (strcmp(cmd, "testAsyncUart") == 0) {
-        do_cmd_testAsyncUart();
-    } else if (strcmp(cmd, "mem_test") == 0) {
-        do_cmd_mem_test();
-    } else if (strcmp(cmd, "thread_test") == 0) {
-        do_cmd_thread_test();
-    } else if (strcmp(cmd, "syscall_test") == 0) {
-        do_cmd_syscall_test();
-    } else {
-        uart_sendline("%s : command not found\n", cmd);
-    }
+    } else if (strcmp(cmd, "testAsyncUart") == 0) do_cmd_testAsyncUart();
+    else if (strcmp(cmd, "mem_test") == 0) do_cmd_mem_test();
+    else if (strcmp(cmd, "thread_test") == 0) do_cmd_thread_test();
+    else if (strcmp(cmd, "syscall_test") == 0) do_cmd_syscall_test();
+    else if (strcmp(cmd, "vfs_test") == 0) do_cmd_vfs_test();
+    else uart_sendline("%s : command not found\n", cmd);
 }
 
 void do_cmd_testAsyncUart() {
@@ -181,7 +168,7 @@ void do_cmd_testAsyncUart() {
 
 void cli_print_banner() {
     uart_sendline("=======================================\r\n");
-    uart_sendline("  Welcome to NYCU-OSC 2024 Lab6 Shell  \r\n");
+    uart_sendline("  Welcome to NYCU-OSC 2024 Lab7 Shell  \r\n");
     uart_sendline("=======================================\r\n");
 }
 
@@ -211,7 +198,9 @@ void do_cmd_cat(char *filepath) {
     uart_sendline("\n");
 }
 
-void do_cmd_dtb() { traverse_device_tree(dtb_ptr, dtb_callback_show_tree); }
+void do_cmd_dtb() {
+    traverse_device_tree(dtb_ptr, dtb_callback_show_tree);
+}
 
 void do_cmd_help() {
     for (int i = 0; i < CLI_MAX_CMD; i++) {
@@ -312,7 +301,9 @@ void do_cmd_set2sTimer(char *msg) {
     add_timer(do_cmd_set2sTimer, msg, 2 * getTimerFreq());
 }
 
-void do_cmd_setTimer(char *msg, int sec) { add_timer(timer_print_msg, msg, sec * getTimerFreq()); }
+void do_cmd_setTimer(char *msg, int sec) {
+    add_timer(timer_print_msg, msg, sec * getTimerFreq());
+}
 
 void do_cmd_mem_test() {
     char *p1 = kmalloc(0x82000);
@@ -483,35 +474,6 @@ void fork_test() {
     // uart_sendline("failed to suicide\n");
 }
 
-// // run in kernel space
-// void fork_test() {
-//     trap_frame *tpf = kmalloc(sizeof(trap_frame));
-//     uart_sendline("\nFork Test, pid %d\n", getpid(tpf));
-//     getCurrentEL();
-//     int cnt = 1;
-//     int ret;
-//     if ((ret = fork(tpf)) == 0) { // child
-//         long long cur_sp;
-//         asm volatile("mov %0, sp" : "=r"(cur_sp));
-//         uart_sendline("first child pid: %d, cnt: %d, ptr: %x, sp : %x\n", getpid(tpf), cnt, &cnt, cur_sp);
-//         ++cnt;
-
-//         if ((ret = fork(tpf)) != 0) {
-//             asm volatile("mov %0, sp" : "=r"(cur_sp));
-//             uart_sendline("first child pid: %d, cnt: %d, ptr: %x, sp : %x\n", getpid(tpf), cnt, &cnt, cur_sp);
-//         } else {
-//             while (cnt < 5) {
-//                 asm volatile("mov %0, sp" : "=r"(cur_sp));
-//                 uart_sendline("second child pid: %d, cnt: %d, ptr: %x, sp : %x\n", getpid(tpf), cnt, &cnt, cur_sp);
-//                 for (int i = 0; i < 1000000; i++)
-//                     asm volatile("nop\n\t");
-//                 ++cnt;
-//             }
-//         }
-//         exit(tpf, 1);
-//     } else {
-//         uart_sendline("parent here, pid %d, child %d\n", getpid(tpf), ret);
-//         exit(tpf, 1);
-//     }
-//     uart_sendline("ending...\n");
-// }
+void do_cmd_vfs_test() {
+    // vfs_test();
+}

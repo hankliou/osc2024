@@ -42,21 +42,31 @@ typedef struct trap_frame {
 } trap_frame;
 
 // sys calls
-int getpid(trap_frame *tpf);
+int    getpid(trap_frame *tpf);
 size_t uart_read(trap_frame *tpf, char buf[], size_t size);
 size_t uart_write(trap_frame *tpf, const char buf[], size_t size);
-int exec(trap_frame *tpf, const char *name, char *const argv[]);
-int fork(trap_frame *tpf);
-void exit(trap_frame *tpf, int status);
-int syscall_mbox_call(trap_frame *tpf, unsigned char ch, unsigned int *mbox_user);
-void kill(int pid);
+int    exec(trap_frame *tpf, const char *name, char *const argv[]);
+int    fork(trap_frame *tpf);
+void   exit(trap_frame *tpf, int status);
+int    syscall_mbox_call(trap_frame *tpf, unsigned char ch, unsigned int *mbox_user);
+void   kill(int pid);
 
 void signal_register(int signal, void (*handler)());
 void signal_kill(int pid, int signal);
 void signal_return(trap_frame *tpf);
 
+int  syscall_open(trap_frame *tpf, const char *pathname, int flags);
+int  syscall_close(trap_frame *tpf, int fd);
+long syscall_write(trap_frame *tpf, int fd, const void *buf, unsigned long count);
+long syscall_read(trap_frame *tpf, int fd, void *buf, unsigned long count);
+int  syscall_mkdir(trap_frame *tpf, const char *pathname, unsigned mode);
+int  syscall_mount(trap_frame *tpf, const char *src, const char *target, const char *file_sys, unsigned long flags, const void *data);
+int  syscall_chdir(trap_frame *tpf, const char *path);
+long syscall_lseek64(trap_frame *tpf, int fd, long offset, int whence);
+int  syscall_ioctl(trap_frame *tpf, int fd, unsigned long request, void *info);
+
 // components
 unsigned int get_file_size(char *path);
-char *get_file_start(char *path);
+char        *get_file_start(char *path);
 
 #endif

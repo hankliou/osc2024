@@ -6,6 +6,7 @@
 #include "timer.h"
 #include "u_string.h"
 #include "uart1.h"
+#include "vfs.h"
 
 extern char *dtb_ptr;
 char input_buffer[CMD_MAX_LEN];
@@ -19,6 +20,7 @@ void main(char *arg) {
 
     allocator_init();
     init_thread();
+    init_rootfs();
 
     cli_print_banner();
 

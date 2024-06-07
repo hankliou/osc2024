@@ -12,7 +12,7 @@
 #include "uart1.h"
 
 extern thread *run_queue;
-extern thread thread_list[PID_MAX + 1];
+extern thread  thread_list[PID_MAX + 1];
 
 extern void *CPIO_DEFAULT_START;
 
@@ -60,8 +60,16 @@ int exec(trap_frame *tpf, const char *name, char *const argv[]) {
     cur_thread->vma_list.next = &(cur_thread->vma_list);
     cur_thread->vma_list.prev = &(cur_thread->vma_list);
 
-    cur_thread->codesize = get_file_size((char *)name);
-    char *new_data = get_file_start((char *)name);
+    // virtual file system
+    char abs_path[MAX_PATH_NAME];
+    strcpy(abs_path, name); // copy file name to path
+    get_absolute_path(abs_path, cur_thread->cur_working_dir);
+    vnode *target_file;
+    vfs_lookup(abs_path, &target_file); // assign the vnode to target
+    cur_thread->codesize = target_file->f_ops->getsize(target_file);
+
+    // char *new_data       = get_file_start((char *)name);
+
     kfree(cur_thread->code);
     cur_thread->code = kmalloc(cur_thread->codesize);
     cur_thread->user_stack_ptr = kmalloc(USTACK_SIZE);
@@ -78,7 +86,12 @@ int exec(trap_frame *tpf, const char *name, char *const argv[]) {
     mmu_add_vma(cur_thread, PERIPHERAL_START, PERIPHERAL_END - PERIPHERAL_START, PERIPHERAL_START, 0b011, 0);
     mmu_add_vma(cur_thread, USER_SIGNAL_WRAPPER_VA, 0x2000, (size_t)VIRT2PHYS(signal_handler_wrapper), 0b101, 0);
 
-    memcpy(cur_thread->code, new_data, cur_thread->codesize);
+    // memcpy(cur_thread->code, new_data, cur_thread->codesize);
+    file *f;
+    vfs_open(abs_path, 0, &f);
+    vfs_read(f, cur_thread->code, cur_thread->codesize);
+    vfs_close(f);
+
     for (int i = 0; i <= SIGNAL_MAX; i++) { cur_thread->signal_handler[i] = signal_default_handler; }
 
     tpf->elr_el1 = USER_KERNEL_BASE;
@@ -94,6 +107,14 @@ int fork(trap_frame *tpf) {
 
     // copy signal handler
     for (int i = 0; i <= SIGNAL_MAX; i++) { child->signal_handler[i] = get_current()->signal_handler[i]; }
+
+    // copy virtual file system
+    for (int i = 0; i <= MAX_FD; i++) {
+        if (get_current()->file_descriptor_table[i]) {
+            child->file_descriptor_table[i] = kmalloc(sizeof(file));
+            *child->file_descriptor_table[i] = *(get_current()->file_descriptor_table[i]); // BUG 沒做lab6 advance不知道會不會動
+        }
+    }
 
     // copy vms
     for (vm_area_struct *vma = &get_current()->vma_list; vma->next != &get_current()->vma_list; vma = vma->next) {
@@ -130,7 +151,9 @@ int fork(trap_frame *tpf) {
     return child->pid;
 }
 
-void exit(trap_frame *tpf, int status) { thread_exit(); }
+void exit(trap_frame *tpf, int status) {
+    thread_exit();
+}
 
 int syscall_mbox_call(trap_frame *tpf, unsigned char ch, unsigned int *mbox_user) {
     lock();
@@ -180,11 +203,112 @@ void signal_return(trap_frame *tpf) {
     load_context(&get_current()->signal_savedContext);
 }
 
+// success: return i(file_descriptor_table entry index), failed: return -1
+int syscall_open(trap_frame *tpf, const char *pathname, int flags) {
+    char abs_path[MAX_PATH_NAME];
+    strcpy(abs_path, pathname);
+
+    // update abs_path
+    get_absolute_path(abs_path, get_current()->cur_working_dir);
+    for (int i = 0; i < MAX_FD; i++) {
+        // find a usable fd
+        if (!get_current()->file_descriptor_table[i]) { // if ith element is null
+            if (vfs_open(abs_path, flags, &get_current()->file_descriptor_table[i]) != 0) break;
+            tpf->x0 = i;
+            return i;
+        }
+    }
+    tpf->x0 = -1;
+    return -1;
+}
+
+// success: return 0, failed: return -1
+int syscall_close(trap_frame *tpf, int fd) {
+    // find the opened fd
+    if (get_current()->file_descriptor_table[fd]) {
+        vfs_close(get_current()->file_descriptor_table[fd]);
+        get_current()->file_descriptor_table[fd] = 0;
+
+        tpf->x0 = 0;
+        return 0;
+    }
+    tpf->x0 = -1;
+    return -1;
+}
+
+// return val is determined by file system implementation
+long syscall_write(trap_frame *tpf, int fd, const void *buf, unsigned long count) {
+    // find the opened fd
+    if (get_current()->file_descriptor_table[fd]) {
+        tpf->x0 = vfs_write(get_current()->file_descriptor_table[fd], buf, count);
+        uart_sendline("in syscall write, %s\n", buf); // FIXME
+        return tpf->x0;
+    }
+    tpf->x0 = -1;
+    return -1;
+}
+
+long syscall_read(trap_frame *tpf, int fd, void *buf, unsigned long count) {
+    uart_sendline("trapframe in sys read: %d, %x, %ld\n", fd, buf, count); // FIXME
+    // find the opened fd
+    if (get_current()->file_descriptor_table[fd]) {
+        tpf->x0 = vfs_read(get_current()->file_descriptor_table[fd], buf, count);
+        uart_sendline("in syscall read, %s\n", buf); // FIXME
+        return tpf->x0;
+    }
+    tpf->x0 = -1;
+    return -1;
+}
+
+int syscall_mkdir(trap_frame *tpf, const char *pathname, unsigned mode) {
+    char abs_path[MAX_PATH_NAME];
+    strcpy(abs_path, pathname);
+    get_absolute_path(abs_path, get_current()->cur_working_dir);
+
+    tpf->x0 = vfs_mkdir(abs_path);
+    return tpf->x0;
+}
+
+// TODO 搞清楚怎麼mount
+int syscall_mount(trap_frame *tpf, const char *src, const char *target, const char *file_sys, unsigned long flags, const void *data) {
+    char abs_path[MAX_PATH_NAME];
+    strcpy(abs_path, target);
+    get_absolute_path(abs_path, get_current()->cur_working_dir);
+
+    tpf->x0 = vfs_mount(abs_path, file_sys);
+    return tpf->x0;
+}
+
+// change current dir
+int syscall_chdir(trap_frame *tpf, const char *path) {
+    char abs_path[MAX_PATH_NAME];
+    strcpy(abs_path, path);
+    get_absolute_path(abs_path, get_current()->cur_working_dir);
+    strcpy(get_current()->cur_working_dir, abs_path);
+
+    return 0;
+}
+
+// TODO 這段不知道在幹嘛
+long syscall_lseek64(trap_frame *tpf, int fd, long offset, int whence) {
+    if (whence == SEEK_SET) { // used for dev_framebuffer // TODO what is dev framebuffer
+        get_current()->file_descriptor_table[fd]->f_pos = offset;
+        tpf->x0 = offset;
+    } else // other is no supported
+        tpf->x0 = -1;
+    return tpf->x0;
+}
+
+// BUG 這裡還沒寫 framebuffer related
+int syscall_ioctl(trap_frame *tpf, int fd, unsigned long request, void *info) {
+    return 0;
+}
+
 /* components */
 unsigned int get_file_size(char *thefilepath) {
-    char *filepath;
-    char *filedata;
-    unsigned int filesize;
+    char                    *filepath;
+    char                    *filedata;
+    unsigned int             filesize;
     struct cpio_newc_header *header_pointer = CPIO_DEFAULT_START;
 
     while (header_pointer != 0) {
@@ -197,9 +321,9 @@ unsigned int get_file_size(char *thefilepath) {
 }
 
 char *get_file_start(char *thefilepath) {
-    char *filepath;
-    char *filedata;
-    unsigned int filesize;
+    char                    *filepath;
+    char                    *filedata;
+    unsigned int             filesize;
     struct cpio_newc_header *header_pointer = CPIO_DEFAULT_START;
 
     while (header_pointer != 0) {

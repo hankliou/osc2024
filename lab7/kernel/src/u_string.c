@@ -9,24 +9,18 @@ unsigned int vsprintf(char *dst, char *fmt, __builtin_va_list args) {
     char *p, *orig = dst, tmpstr[19];
 
     // failsafes
-    if (dst == (void *)0 || fmt == (void *)0) {
-        return 0;
-    }
+    if (dst == (void *)0 || fmt == (void *)0) { return 0; }
 
     // main loop
     arg = 0;
     while (*fmt) {
-        if (dst - orig > VSPRINT_MAX_BUF_SIZE - 0x10) {
-            return -1;
-        }
+        if (dst - orig > VSPRINT_MAX_BUF_SIZE - 0x10) { return -1; }
 
         // argument access
         if (*fmt == '%') {
             fmt++;
             // case '%%'
-            if (*fmt == '%') {
-                goto put;
-            }
+            if (*fmt == '%') { goto put; }
 
             len = 0; // size modifier (precision)
             while (*fmt >= '0' && *fmt <= '9') {
@@ -53,9 +47,7 @@ unsigned int vsprintf(char *dst, char *fmt, __builtin_va_list args) {
                     arg *= -1;
                     sign = 1; // #
                 }
-                if (arg > 99999999999999999L) {
-                    arg = 99999999999999999L;
-                }
+                if (arg > 99999999999999999L) { arg = 99999999999999999L; }
 
                 // convert to string
                 i = 18;
@@ -64,13 +56,9 @@ unsigned int vsprintf(char *dst, char *fmt, __builtin_va_list args) {
                     tmpstr[--i] = '0' + (arg % 10);
                     arg /= 10;
                 } while (arg != 0 && i > 0);
-                if (sign) {
-                    tmpstr[--i] = '-';
-                }
+                if (sign) { tmpstr[--i] = '-'; }
                 if (len > 0 && len < 18) { // size modifier
-                    while (i > 18 - len) {
-                        tmpstr[--i] = ' ';
-                    }
+                    while (i > 18 - len) { tmpstr[--i] = ' '; }
                 }
 
                 p = &tmpstr[i]; // p = head of output string
@@ -85,18 +73,14 @@ unsigned int vsprintf(char *dst, char *fmt, __builtin_va_list args) {
                     arg >>= 4;
                 } while (arg != 0 && i > 0);
                 if (len > 0 && len <= 16) { // size modifier
-                    while (i > 16 - len) {
-                        tmpstr[--i] = '0';
-                    }
+                    while (i > 16 - len) { tmpstr[--i] = '0'; }
                 }
                 p = &tmpstr[i];
                 goto copystring;
             } else if (*fmt == 's') {
                 p = __builtin_va_arg(args, char *);
             copystring:
-                if (p == (void *)0) {
-                    p = "(null)";
-                }
+                if (p == (void *)0) { p = "(null)"; }
                 while (*p) {
                     *dst++ = *p++; // copy p's content into dst
                 }
@@ -122,10 +106,13 @@ unsigned int sprintf(char *dst, char *fmt, ...) {
 unsigned long long strlen(const char *str) {
     size_t count = 0;
     // stop when encounter '\0'
-    while ((unsigned char)*str++) {
-        count++;
-    }
+    while ((unsigned char)*str++) { count++; }
     return count;
+}
+
+char *strcat(char *dest, const char *src) {
+    strcpy(dest + strlen(dest), src);
+    return dest;
 }
 
 int strcmp(const char *p1, const char *p2) {
@@ -136,8 +123,7 @@ int strcmp(const char *p1, const char *p2) {
     do {
         c1 = (unsigned char)*s1++;
         c2 = (unsigned char)*s2++;
-        if (c1 == '\0')
-            return c1 - c2;
+        if (c1 == '\0') return c1 - c2;
     } while (c1 == c2);
     return c1 - c2;
 }
@@ -151,20 +137,16 @@ int strncmp(const char *s1, const char *s2, unsigned long long n) {
             // loop unroll
             c1 = (unsigned char)*s1++;
             c2 = (unsigned char)*s2++;
-            if (c1 == '\0' || c1 != c2)
-                return c1 - c2;
+            if (c1 == '\0' || c1 != c2) return c1 - c2;
             c1 = (unsigned char)*s1++;
             c2 = (unsigned char)*s2++;
-            if (c1 == '\0' || c1 != c2)
-                return c1 - c2;
+            if (c1 == '\0' || c1 != c2) return c1 - c2;
             c1 = (unsigned char)*s1++;
             c2 = (unsigned char)*s2++;
-            if (c1 == '\0' || c1 != c2)
-                return c1 - c2;
+            if (c1 == '\0' || c1 != c2) return c1 - c2;
             c1 = (unsigned char)*s1++;
             c2 = (unsigned char)*s2++;
-            if (c1 == '\0' || c1 != c2)
-                return c1 - c2;
+            if (c1 == '\0' || c1 != c2) return c1 - c2;
         } while (--n4 > 0);
 
         n &= 3;
@@ -172,8 +154,7 @@ int strncmp(const char *s1, const char *s2, unsigned long long n) {
     while (n > 0) {
         c1 = (unsigned char)*s1++;
         c2 = (unsigned char)*s2++;
-        if (c1 == '\0' || c1 != c2)
-            return c1 - c2;
+        if (c1 == '\0' || c1 != c2) return c1 - c2;
         n--;
     }
     return c1 - c2;
@@ -182,20 +163,15 @@ int strncmp(const char *s1, const char *s2, unsigned long long n) {
 char *memcpy(void *dest, const void *src, unsigned long long len) {
     char *d = dest;
     const char *s = src;
-    while (len--) {
-        *d++ = *s++;
-    }
+    while (len--) { *d++ = *s++; }
     return dest;
 }
 
-char *strcpy(char *dest, const char *src) {
-    return memcpy(dest, src, strlen(src) + 1);
-}
+char *strcpy(char *dest, const char *src) { return memcpy(dest, src, strlen(src) + 1); }
 
 void *memset(void *s, int c, size_t n) {
     char *start = s;
-    for (size_t i = 0; i < n; i++)
-        start[i] = c;
+    for (size_t i = 0; i < n; i++) start[i] = c;
     return s;
 }
 
@@ -219,8 +195,7 @@ char *str_SepbySpace(char *head) {
 int atoi(char *str) {
     int val = 0;
     for (int i = 0; str[i] != 0; i++) {
-        if (*str < '0' || *str > '9')
-            return val;
+        if (*str < '0' || *str > '9') return val;
         val = val * 10 + *str - '0';
     }
     return val;

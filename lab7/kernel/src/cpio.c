@@ -1,6 +1,9 @@
 #include "cpio.h"
 #include "u_string.h"
 
+void *CPIO_DEFAULT_START; // root of ramfs
+void *CPIO_DEFAULT_END;   // end addressl of ramfs
+
 /* Parse an ASCII hex string into an integer. (big endian)*/
 static unsigned int parse_hex_str(char *s, unsigned int max_len) {
     unsigned int r = 0;
@@ -21,27 +24,22 @@ static unsigned int parse_hex_str(char *s, unsigned int max_len) {
 }
 
 //
-int cpio_newc_parse_header(struct cpio_newc_header *this_header_pointer,
-                           char **pathname, unsigned int *filesize, char **data,
+int cpio_newc_parse_header(struct cpio_newc_header *this_header_pointer, char **pathname, unsigned int *filesize, char **data,
                            struct cpio_newc_header **next_header_pointer) {
     // this_header_pointer: ptr point to newc format header
     // pathname: double ptr point to "ptr point to 'this_header_pointer'"
     /* Ensure magic header exists. */
-    if (strncmp(this_header_pointer->c_magic, CPIO_NEWC_HEADER_MAGIC,
-                sizeof(this_header_pointer->c_magic)) != 0)
-        return -1;
+    if (strncmp(this_header_pointer->c_magic, CPIO_NEWC_HEADER_MAGIC, sizeof(this_header_pointer->c_magic)) != 0) return -1;
 
     // transfer big endian 8 byte hex string to unsigned int and store into
     // *filesize 8 is the size of type "long"
     *filesize = parse_hex_str(this_header_pointer->c_filesize, 8);
 
     // file path start at the bit after header
-    *pathname = ((char *)this_header_pointer) +
-                sizeof(struct cpio_newc_header); // pointer + offset
+    *pathname = ((char *)this_header_pointer) + sizeof(struct cpio_newc_header); // pointer + offset
 
     // data start at the bit after file path
-    unsigned int pathname_length =
-        parse_hex_str(this_header_pointer->c_namesize, 8);
+    unsigned int pathname_length = parse_hex_str(this_header_pointer->c_namesize, 8);
     unsigned int offset = pathname_length + sizeof(struct cpio_newc_header);
 
     // pad data to align 4-byte
@@ -54,16 +52,10 @@ int cpio_newc_parse_header(struct cpio_newc_header *this_header_pointer,
         *next_header_pointer = (struct cpio_newc_header *)*data;
     } else {
         offset = *filesize;
-        *next_header_pointer =
-            (struct cpio_newc_header *)(*data +
-                                        (offset % 4 == 0
-                                             ? offset
-                                             : (offset + 4 - offset % 4)));
+        *next_header_pointer = (struct cpio_newc_header *)(*data + (offset % 4 == 0 ? offset : (offset + 4 - offset % 4)));
     }
 
     // if file path == TRAILER!!! mean there's no more file behind
-    if (strncmp(*pathname, "TRAILER!!!", sizeof("TRAILER!!!")) == 0) {
-        *next_header_pointer = 0;
-    }
+    if (strncmp(*pathname, "TRAILER!!!", sizeof("TRAILER!!!")) == 0) { *next_header_pointer = 0; }
     return 0;
 }

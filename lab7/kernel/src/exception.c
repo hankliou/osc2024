@@ -8,11 +8,11 @@
 #include "timer.h"
 #include "uart1.h"
 
-irq_node *irq_head; // head is empty, every node come after head
+irq_node      *irq_head; // head is empty, every node come after head
 extern thread *run_queue;
 
 static unsigned long long lock_count = 0;
-void lock() {
+void                      lock() {
     el1_interrupt_disable(); // enter critical section
     lock_count++;
 }
@@ -48,31 +48,37 @@ void el0_sync_router(trap_frame *tpf) {
     int syscall_no = tpf->x8;
     // uart_sendline("syscall: %d\n", syscall_no); // FIXME
     if (syscall_no == 0) getpid(tpf);
-    // 'UART syscall' user have to allocate spaces to x0(buf) theirself
-    else if (syscall_no == 1)
-        uart_read(tpf, (char *)tpf->x0, tpf->x1);
-    else if (syscall_no == 2)
-        uart_write(tpf, (char *)tpf->x0, tpf->x1);
-    else if (syscall_no == 3)
-        exec(tpf, (char *)tpf->x0, (char **)tpf->x1);
-    else if (syscall_no == 4)
-        fork(tpf);
-    else if (syscall_no == 5)
-        exit(tpf, tpf->x0);
-    else if (syscall_no == 6)
-        syscall_mbox_call(tpf, (unsigned char)tpf->x0, (unsigned int *)tpf->x1);
-    else if (syscall_no == 7)
-        kill(tpf->x0);
-    else if (syscall_no == 8)
-        signal_register(tpf->x0, (void (*)())(tpf->x1));
-    else if (syscall_no == 9)
-        signal_kill(tpf->x0, tpf->x1);
-    else if (syscall_no == 99)
-        signal_return(tpf);
+    else if (syscall_no == 1) uart_read(tpf, (char *)tpf->x0, tpf->x1);
+    else if (syscall_no == 2) uart_write(tpf, (char *)tpf->x0, tpf->x1);
+    else if (syscall_no == 3) exec(tpf, (char *)tpf->x0, (char **)tpf->x1);
+    else if (syscall_no == 4) fork(tpf);
+    else if (syscall_no == 5) exit(tpf, tpf->x0);
+    else if (syscall_no == 6) syscall_mbox_call(tpf, (unsigned char)tpf->x0, (unsigned int *)tpf->x1);
+    else if (syscall_no == 7) kill(tpf->x0);
+    else if (syscall_no == 8) signal_register(tpf->x0, (void (*)())(tpf->x1));
+    else if (syscall_no == 9) signal_kill(tpf->x0, tpf->x1);
+    // else if (syscall_no == 10) // TODO lab6 advance
+    else if (syscall_no == 11) syscall_open(tpf, (char *)tpf->x0, tpf->x1);
+    else if (syscall_no == 12) syscall_close(tpf, tpf->x0);
+    else if (syscall_no == 13) {
+        syscall_write(tpf, tpf->x0, (char *)tpf->x1, tpf->x2);
+        uart_sendline("syscall writing\n");
+
+    } else if (syscall_no == 14) {
+        syscall_read(tpf, tpf->x0, (char *)tpf->x1, tpf->x2);
+        uart_sendline("syscall reading\n");
+    } else if (syscall_no == 15) syscall_mkdir(tpf, (char *)tpf->x0, tpf->x1);
+    else if (syscall_no == 16) syscall_mount(tpf, (char *)tpf->x0, (char *)tpf->x1, (char *)tpf->x2, tpf->x3, (void *)tpf->x4);
+    else if (syscall_no == 17) syscall_chdir(tpf, (char *)tpf->x0);
+    else if (syscall_no == 18) syscall_lseek64(tpf, tpf->x0, tpf->x1, tpf->x2);
+    else if (syscall_no == 19) syscall_ioctl(tpf, tpf->x0, tpf->x1, (void *)tpf->x2);
+    else if (syscall_no == 99) signal_return(tpf);
     else {
         uart_sendline("Invalid System Call Number\n");
         while (1) {};
     }
+    // TODO add INT disable???
+    el1_interrupt_disable();
 }
 
 void el1h_irq_router(trap_frame *tpf) {
@@ -95,9 +101,13 @@ void el1h_irq_router(trap_frame *tpf) {
         add_irq_task(timer_handler, TIMER_IRQ_PRIORITY);
         timer_enable_interrupt(); // pospond to re-open after handling
         // at least two thread running -> schedule for any timer irq
+        // BUG: 這裡 CRTAO 有disable interrupt
+        el1_interrupt_disable();
         if (run_queue && run_queue->next && run_queue->next->next != run_queue) schedule();
     }
     check_signal(tpf);
+    el1_interrupt_disable();
+    // BUG 這裡也有disable interrupt
 }
 
 void invalid_exception_router(int no) {

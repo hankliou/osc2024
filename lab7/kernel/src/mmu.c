@@ -105,7 +105,7 @@ void mmu_add_vma(thread *t, size_t va, size_t size, size_t pa, size_t xwr, int i
     mem->prev = t->vma_list.prev;
     mem->next->prev = mem;
     mem->prev->next = mem;
-    uart_sendline("mmu add vma paddr: %x\n", mem->phys_addr);
+    // uart_sendline("mmu add vma paddr: %x\n", mem->phys_addr);
 }
 
 // remove thread's private vma list
@@ -148,7 +148,7 @@ void mmu_memfail_abort_handler(esr_el1 *esr) {
     // uart_sendline("far_el1: %x\n", far_el1);
 
     // search virt addr in va_list
-    thread *cur_thread = get_current();
+    thread         *cur_thread = get_current();
     vm_area_struct *memory = 0;
     for (vm_area_struct *it = cur_thread->vma_list.next; it != &cur_thread->vma_list; it = it->next) {
         // far_el1 is inside any node in vma_list
@@ -171,7 +171,7 @@ void mmu_memfail_abort_handler(esr_el1 *esr) {
         (esr->iss & 0x3f) == TRANS_FAULT_LEVEL2 || // lv2
         (esr->iss & 0x3f) == TRANS_FAULT_LEVEL3) { // lv3
 
-        uart_sendline("[Translation Fault] 0x%x\n", far_el1);
+        // uart_sendline("[Translation Fault] 0x%x\n", far_el1);
 
         // get offset and align to 0x1000 (phys addr usage)
         size_t offset = far_el1 - (memory->virt_addr);

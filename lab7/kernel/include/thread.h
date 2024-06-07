@@ -7,6 +7,7 @@
 #define SIGNAL_MAX  64
 
 #include "mmu.h"
+#include "vfs.h"
 
 typedef struct thread_context {
     // callee saved registers
@@ -23,47 +24,50 @@ typedef struct thread_context {
     unsigned long x27;
     unsigned long x28;
     // note: sp & fp are the up/down vaild boundary of function's stack
-    unsigned long fp; // frame pointer: base pointer for local variable in stack
-    unsigned long lr; // link register: store return address
-    unsigned long sp; // stack pointer:
-    void *pgd;        // use for MMU mapping in user space
+    unsigned long fp;  // frame pointer: base pointer for local variable in stack
+    unsigned long lr;  // link register: store return address
+    unsigned long sp;  // stack pointer:
+    void         *pgd; // use for MMU mapping in user space
 } thread_context;
 
 typedef struct thread {
     thread_context context; // context(registers) need to store
     struct thread *next;
     struct thread *prev;
-    int pid;                // process id
-    char *code;             // something static like .text .data blablabla
-    unsigned int codesize;  // size of static data (code)
-    int isused;             // flag, check if thread is in used
-    int iszombie;           // zombie flag
-    char *user_stack_ptr;   // stack segment
-    char *kernel_stack_ptr; // store register when enter kernel mode
+    int            pid;              // process id
+    char          *code;             // something static like .text .data blablabla
+    unsigned int   codesize;         // size of static data (code)
+    int            isused;           // flag, check if thread is in used
+    int            iszombie;         // zombie flag
+    char          *user_stack_ptr;   // stack segment
+    char          *kernel_stack_ptr; // store register when enter kernel mode
 
     int sigcount[SIGNAL_MAX + 1];             // Signal Pending buffer
     void (*signal_handler[SIGNAL_MAX + 1])(); // Signal handlers for different signal
     void (*curr_signal_handler)();            // Allow Signal handler overwritten by others
-    int signal_inProcess;                     // Signal Processing Lock (flag)
+    int            signal_inProcess;          // Signal Processing Lock (flag)
     thread_context signal_savedContext;       // Store registers before signal handler involving
 
     vm_area_struct vma_list; // shared memory list (virtual memory)
+
+    char  cur_working_dir[MAX_PATH_NAME + 1]; // lab7 vfs
+    file *file_descriptor_table[MAX_FD + 1];
 } thread;
 
-extern void switch_to(void *curr_context, void *next_context);
+extern void    switch_to(void *curr_context, void *next_context);
 extern thread *get_current();
-extern void store_context(thread_context *addr);
-extern void load_context(thread_context *addr);
+extern void    store_context(thread_context *addr);
+extern void    load_context(thread_context *addr);
 
-void init_thread();
-thread *thread_create(void *func, size_t filesize);  // runable function
-void schedule();                                     // switch to next job
-void idle();                                         // keep scheduling
-void thread_exit();                                  // mark thread 'zombie'
-void kill_zombie();                                  // remove zombie process
-void thread_exec(char *code, unsigned int codesize); // exec task in new thread
-void schedule_timer();                               // basic 3, "Set the expired time as core timer frequency shift right 5 bits."
-void foo();                                          // test function
-void from_el1_to_el0(thread *t);                     // switch to user space
+void    init_thread();
+thread *thread_create(void *func, size_t filesize);     // runable function
+void    schedule();                                     // switch to next job
+void    idle();                                         // keep scheduling
+void    thread_exit();                                  // mark thread 'zombie'
+void    kill_zombie();                                  // remove zombie process
+void    thread_exec(char *code, unsigned int codesize); // exec task in new thread
+void    schedule_timer();                               // basic 3, "Set the expired time as core timer frequency shift right 5 bits."
+void    foo();                                          // test function
+void    from_el1_to_el0(thread *t);                     // switch to user space
 
 #endif /* _THREAD_H_ */

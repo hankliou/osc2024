@@ -7,7 +7,7 @@
 #include "u_string.h"
 #include "uart1.h"
 
-thread thread_list[PID_MAX + 1];
+thread  thread_list[PID_MAX + 1];
 thread *run_queue = thread_list;
 
 int pid_cnt = 0;
@@ -39,10 +39,8 @@ thread *thread_create(void *func, size_t codesize) {
 
     // pick a pid
     // TODO: pid_cnt need to mod max size
-    if (!thread_list[pid_cnt].isused)
-        the_thread = &thread_list[pid_cnt++];
-    else
-        return 0;
+    if (!thread_list[pid_cnt].isused) the_thread = &thread_list[pid_cnt++];
+    else return 0;
 
     // init property of 'the_thread'
     the_thread->iszombie = 0;
@@ -62,6 +60,9 @@ thread *thread_create(void *func, size_t codesize) {
         the_thread->sigcount[i] = 0;
         the_thread->signal_handler[i] = signal_default_handler;
     }
+
+    // vfs
+    strcpy(the_thread->cur_working_dir, "/");
 
     // lab6 vm's init
     the_thread->vma_list.next = &the_thread->vma_list;
@@ -122,12 +123,18 @@ void kill_zombie() {
             cur->next->prev = cur->prev;
             cur->prev->next = cur->next;
 
-            // lab6
+            // virtual memory
             mmu_free_page_tables(cur->context.pgd, 0); // remove vm tables
             mmu_del_vma(cur);                          // remove vma_list
 
+            // virtual file system
+            for (int i = 0; i < MAX_FD; i++) {
+                if (cur->file_descriptor_table[i]) vfs_close(cur->file_descriptor_table[i]);
+            }
+
             kfree(cur->kernel_stack_ptr); // release memory
             kfree(cur->user_stack_ptr);
+            kfree(PHYS2VIRT(cur->context.pgd));
 
             cur->isused = 0; // update thread status
             cur->iszombie = 0;
@@ -152,6 +159,11 @@ void thread_exec(char *code, unsigned int codesize) {
     t->context.fp = USER_STACK_TOP;
     t->context.lr = USER_KERNEL_BASE;
 
+    // lab7, dev_uart
+    vfs_open("/dev/uart", 0, &(get_current()->file_descriptor_table[0])); // stdin
+    vfs_open("/dev/uart", 0, &(get_current()->file_descriptor_table[1])); // stdout
+    vfs_open("/dev/uart", 0, &(get_current()->file_descriptor_table[2])); // stderr
+
     // vm related setup
     asm volatile("dsb ish");                                 // memory barrier
     asm volatile("msr ttbr0_el1, %0" ::"r"(t->context.pgd)); // load thread's pgd
@@ -171,7 +183,9 @@ void thread_exec(char *code, unsigned int codesize) {
     asm volatile("eret"); // switch EL to 0
 }
 
-void schedule_timer() { add_timer(schedule_timer, "re-schedule", getTimerFreq() >> 5); }
+void schedule_timer() {
+    add_timer(schedule_timer, "re-schedule", getTimerFreq() >> 5);
+}
 
 void foo() {
     for (int i = 0; i < 10; ++i) {
