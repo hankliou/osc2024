@@ -62,11 +62,11 @@ void el0_sync_router(trap_frame *tpf) {
     else if (syscall_no == 12) syscall_close(tpf, tpf->x0);
     else if (syscall_no == 13) {
         syscall_write(tpf, tpf->x0, (char *)tpf->x1, tpf->x2);
-        uart_sendline("syscall writing\n");
+        // uart_sendline("syscall writing\n");
 
     } else if (syscall_no == 14) {
         syscall_read(tpf, tpf->x0, (char *)tpf->x1, tpf->x2);
-        uart_sendline("syscall reading\n");
+        // uart_sendline("syscall reading\n");
     } else if (syscall_no == 15) syscall_mkdir(tpf, (char *)tpf->x0, tpf->x1);
     else if (syscall_no == 16) syscall_mount(tpf, (char *)tpf->x0, (char *)tpf->x1, (char *)tpf->x2, tpf->x3, (void *)tpf->x4);
     else if (syscall_no == 17) syscall_chdir(tpf, (char *)tpf->x0);

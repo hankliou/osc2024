@@ -16,14 +16,14 @@ int init_dev_uart() {
 }
 
 int dev_uart_write(file *file, const void *buf, size_t len) {
-    uart_sendline("dev uart writing\n"); // FIXME
+    // uart_sendline("dev uart writing\n"); // FIXME
     const char *char_buf = buf;
     for (int i = 0; i < len; i++) uart_async_putc(char_buf[i]);
     return len;
 }
 
 int dev_uart_read(file *file, void *buf, size_t len) {
-    uart_sendline("dev uart reading\n"); // FIXME
+    // uart_sendline("dev uart reading\n"); // FIXME
     char *char_buf = buf;
     for (int i = 0; i < len; i++) char_buf[i] = uart_async_getc();
     return len;

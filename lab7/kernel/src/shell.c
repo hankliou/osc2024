@@ -13,7 +13,7 @@
 #include "vfs.h"
 
 extern char *dtb_ptr;
-extern int uart_recv_echo_flag;
+extern int   uart_recv_echo_flag;
 
 extern void *CPIO_DEFAULT_START; // root of ramfs
 extern void *CPIO_DEFAULT_END;   // end addressl of ramfs
@@ -34,13 +34,12 @@ struct CLI_CMDS cmd_list[CLI_MAX_CMD] = {
     {.command = "mem_test", .help = "lazy testing kmalloc and kfree"},
     {.command = "thread_test", .help = "test threads interleaving"},
     {.command = "syscall_test", .help = "test syscall"},
-    {.command = "vfs_test", .help = "test vfs"},
 };
 
 void do_cmd_exec(char *filepath) {
-    char *c_filepath;
-    char *c_filedata;
-    unsigned int c_filesize;
+    char                    *c_filepath;
+    char                    *c_filedata;
+    unsigned int             c_filesize;
     struct cpio_newc_header *header_ptr = CPIO_DEFAULT_START;
 
     // traverse the whole ramdisk, check filename one by one
@@ -67,7 +66,7 @@ void do_cmd_exec(char *filepath) {
 int cli_cmd_strcmp(const char *p1, const char *p2) {
     const unsigned char *s1 = (const unsigned char *)p1;
     const unsigned char *s2 = (const unsigned char *)p2;
-    unsigned char c1, c2;
+    unsigned char        c1, c2;
 
     do {
         c1 = (unsigned char)*s1++;
@@ -145,7 +144,6 @@ void cli_cmd_exec(char *buffer) {
     else if (strcmp(cmd, "mem_test") == 0) do_cmd_mem_test();
     else if (strcmp(cmd, "thread_test") == 0) do_cmd_thread_test();
     else if (strcmp(cmd, "syscall_test") == 0) do_cmd_syscall_test();
-    else if (strcmp(cmd, "vfs_test") == 0) do_cmd_vfs_test();
     else uart_sendline("%s : command not found\n", cmd);
 }
 
@@ -153,7 +151,7 @@ void do_cmd_testAsyncUart() {
     while (1) {
         uart_sendline("type 'q' to quit\n");
         char buffer[CMD_MAX_LEN];
-        int idx = 0;
+        int  idx = 0;
         while (idx < CMD_MAX_LEN) {
             char c = uart_async_getc();
             buffer[idx++] = c;
@@ -173,9 +171,9 @@ void cli_print_banner() {
 }
 
 void do_cmd_cat(char *filepath) {
-    char *c_filepath;
-    char *c_filedata;
-    unsigned int c_filesize;
+    char                    *c_filepath;
+    char                    *c_filedata;
+    unsigned int             c_filesize;
     struct cpio_newc_header *header_ptr = CPIO_DEFAULT_START;
 
     // traverse the whole ramdisk, check filename one by one
@@ -267,9 +265,9 @@ void do_cmd_simple_malloc() {
 }
 
 void do_cmd_ls(char *dir) {
-    char *c_filepath;
-    char *c_filedata;
-    unsigned int c_filesize;
+    char                    *c_filepath;
+    char                    *c_filedata;
+    unsigned int             c_filesize;
     struct cpio_newc_header *header_ptr = CPIO_DEFAULT_START;
 
     while (header_ptr != 0) {
@@ -472,8 +470,4 @@ void fork_test() {
     // kill test
     // test_kill(test_getpid());
     // uart_sendline("failed to suicide\n");
-}
-
-void do_cmd_vfs_test() {
-    // vfs_test();
 }

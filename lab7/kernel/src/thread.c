@@ -159,10 +159,12 @@ void thread_exec(char *code, unsigned int codesize) {
     t->context.fp = USER_STACK_TOP;
     t->context.lr = USER_KERNEL_BASE;
 
+    asm volatile("msr tpidr_el1, %0;" ::"r"(&t->context)); // hold the "kernel(el1)" thread structure info
     // lab7, dev_uart
-    vfs_open("/dev/uart", 0, &(get_current()->file_descriptor_table[0])); // stdin
-    vfs_open("/dev/uart", 0, &(get_current()->file_descriptor_table[1])); // stdout
-    vfs_open("/dev/uart", 0, &(get_current()->file_descriptor_table[2])); // stderr
+    thread *cur_thread = get_current();
+    vfs_open("/dev/uart", 0, &(cur_thread->file_descriptor_table[0])); // stdin
+    vfs_open("/dev/uart", 0, &(cur_thread->file_descriptor_table[1])); // stdout
+    vfs_open("/dev/uart", 0, &(cur_thread->file_descriptor_table[2])); // stderr
 
     // vm related setup
     asm volatile("dsb ish");                                 // memory barrier
@@ -172,7 +174,6 @@ void thread_exec(char *code, unsigned int codesize) {
     asm volatile("isb");                                     // clear pipeline
 
     // basic EL switch setup
-    asm volatile("msr tpidr_el1, %0;" ::"r"(&t->context));                // hold the "kernel(el1)" thread structure info
     asm volatile("msr elr_el1, %0;" ::"r"(t->context.lr));                // set exception return addr to 'c_filedata'
     asm volatile("msr spsr_el1, %0;" ::"r"(0x0));                         // set state to user mode, and enable interrupt
     asm volatile("msr sp_el0, %0;" ::"r"(t->context.sp));                 //

@@ -239,9 +239,9 @@ int syscall_close(trap_frame *tpf, int fd) {
 // return val is determined by file system implementation
 long syscall_write(trap_frame *tpf, int fd, const void *buf, unsigned long count) {
     // find the opened fd
-    if (get_current()->file_descriptor_table[fd]) {
-        tpf->x0 = vfs_write(get_current()->file_descriptor_table[fd], buf, count);
-        uart_sendline("in syscall write, %s\n", buf); // FIXME
+    thread *cur_thread = get_current();
+    if (cur_thread->file_descriptor_table[fd]) {
+        tpf->x0 = vfs_write(cur_thread->file_descriptor_table[fd], buf, count);
         return tpf->x0;
     }
     tpf->x0 = -1;
@@ -249,11 +249,10 @@ long syscall_write(trap_frame *tpf, int fd, const void *buf, unsigned long count
 }
 
 long syscall_read(trap_frame *tpf, int fd, void *buf, unsigned long count) {
-    uart_sendline("trapframe in sys read: %d, %x, %ld\n", fd, buf, count); // FIXME
     // find the opened fd
-    if (get_current()->file_descriptor_table[fd]) {
-        tpf->x0 = vfs_read(get_current()->file_descriptor_table[fd], buf, count);
-        uart_sendline("in syscall read, %s\n", buf); // FIXME
+    thread *cur_thread = get_current();
+    if (cur_thread->file_descriptor_table[fd]) {
+        tpf->x0 = vfs_read(cur_thread->file_descriptor_table[fd], buf, count);
         return tpf->x0;
     }
     tpf->x0 = -1;
