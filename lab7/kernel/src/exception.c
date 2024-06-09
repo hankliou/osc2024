@@ -60,14 +60,9 @@ void el0_sync_router(trap_frame *tpf) {
     // else if (syscall_no == 10) // TODO lab6 advance
     else if (syscall_no == 11) syscall_open(tpf, (char *)tpf->x0, tpf->x1);
     else if (syscall_no == 12) syscall_close(tpf, tpf->x0);
-    else if (syscall_no == 13) {
-        syscall_write(tpf, tpf->x0, (char *)tpf->x1, tpf->x2);
-        // uart_sendline("syscall writing\n");
-
-    } else if (syscall_no == 14) {
-        syscall_read(tpf, tpf->x0, (char *)tpf->x1, tpf->x2);
-        // uart_sendline("syscall reading\n");
-    } else if (syscall_no == 15) syscall_mkdir(tpf, (char *)tpf->x0, tpf->x1);
+    else if (syscall_no == 13) syscall_write(tpf, tpf->x0, (char *)tpf->x1, tpf->x2);
+    else if (syscall_no == 14) syscall_read(tpf, tpf->x0, (char *)tpf->x1, tpf->x2);
+    else if (syscall_no == 15) syscall_mkdir(tpf, (char *)tpf->x0, tpf->x1);
     else if (syscall_no == 16) syscall_mount(tpf, (char *)tpf->x0, (char *)tpf->x1, (char *)tpf->x2, tpf->x3, (void *)tpf->x4);
     else if (syscall_no == 17) syscall_chdir(tpf, (char *)tpf->x0);
     else if (syscall_no == 18) syscall_lseek64(tpf, tpf->x0, tpf->x1, tpf->x2);
@@ -78,7 +73,7 @@ void el0_sync_router(trap_frame *tpf) {
         while (1) {};
     }
     // TODO add INT disable???
-    el1_interrupt_disable();
+    // el1_interrupt_disable();
 }
 
 void el1h_irq_router(trap_frame *tpf) {
@@ -102,11 +97,11 @@ void el1h_irq_router(trap_frame *tpf) {
         timer_enable_interrupt(); // pospond to re-open after handling
         // at least two thread running -> schedule for any timer irq
         // BUG: 這裡 CRTAO 有disable interrupt
-        el1_interrupt_disable();
+        // el1_interrupt_disable();
         if (run_queue && run_queue->next && run_queue->next->next != run_queue) schedule();
     }
     check_signal(tpf);
-    el1_interrupt_disable();
+    // el1_interrupt_disable();
     // BUG 這裡也有disable interrupt
 }
 

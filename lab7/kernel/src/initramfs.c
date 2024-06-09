@@ -27,6 +27,7 @@ int register_initramfs() {
     filesystem fs;
     fs.name = "initramfs";                  // init name
     fs.setup_mount = initramfs_setup_mount; // init func ptr
+    // BUG fs.sync??
     return register_filesystem(&fs);
 }
 
@@ -38,10 +39,10 @@ int initramfs_setup_mount(filesystem *fs, mount *mnt) {
     initramfs_inode *ramfs_inode = mnt->root->internal;
 
     // add all file in initramfs to filesystem
-    char *filepath, *filedata;
-    unsigned int filesize;
+    char             *filepath, *filedata;
+    unsigned int      filesize;
     cpio_newc_header *header_ptr = CPIO_DEFAULT_START;
-    int idx = 0;
+    int               idx = 0;
 
     while (header_ptr != 0) {
         int error = cpio_newc_parse_header(header_ptr, &filepath, &filesize, &filedata, &header_ptr);
@@ -52,7 +53,7 @@ int initramfs_setup_mount(filesystem *fs, mount *mnt) {
 
         // if not TRAILER!!!
         if (header_ptr != 0) {
-            vnode *file_vnode = initramfs_create_vnode(0, file_t);
+            vnode           *file_vnode = initramfs_create_vnode(0, file_t);
             initramfs_inode *file_inode = file_vnode->internal; // record content in inode
             file_inode->data = filedata;
             file_inode->datasize = filesize;
@@ -107,7 +108,7 @@ long initramfs_getsize(vnode *vn) {
 /* -------------------------------------------------------------- */
 int initramfs_lookup(vnode *dir_node, vnode **target, const char *component_name) {
     initramfs_inode *dir_inode = dir_node->internal;
-    int child_idx = 0;
+    int              child_idx = 0;
     for (; child_idx < INITRAMFS_MAX_DIR_ENTRY; child_idx++) {
         vnode *vn = dir_inode->entry[child_idx];
         if (!vn) break;

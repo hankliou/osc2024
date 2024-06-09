@@ -1,4 +1,5 @@
 #include "vfs.h"
+#include "dev_framebuffer.h"
 #include "dev_uart.h"
 #include "initramfs.h"
 #include "memory.h"
@@ -25,7 +26,8 @@ void init_rootfs() {
     vfs_mkdir("/dev");
     int uart_id = init_dev_uart();
     vfs_mknod("/dev/uart", uart_id);
-    // int framebuffer_id = init
+    int framebuffer_id = init_dev_framebuffer();
+    vfs_mknod("/dev/framebuffer", framebuffer_id);
 }
 
 // copy param 'fs' into table

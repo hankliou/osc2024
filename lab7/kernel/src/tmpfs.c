@@ -23,7 +23,6 @@ int register_tmpfs() {
     filesystem fs;
     fs.name = "tmpfs";
     fs.setup_mount = tmpfs_setup_mount; // point to customized mount func
-    // BUG fs.sync??
     return register_filesystem(&fs);
 }
 
@@ -90,7 +89,7 @@ long tmpfs_getsize(vnode *vn) {
 // examine if is a file named 'component_name' under 'dir_node', 0:success, !!target will be move on next node!!
 int tmpfs_lookup(vnode *dir_node, vnode **target, const char *component_name) {
     tmpfs_inode *dir_inode = dir_node->internal;
-    int child_idx = 0;
+    int          child_idx = 0;
 
     // BFS search tree
     for (; child_idx <= MAX_DIR_ENTRY; child_idx++) {
