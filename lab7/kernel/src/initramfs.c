@@ -27,7 +27,6 @@ int register_initramfs() {
     filesystem fs;
     fs.name = "initramfs";                  // init name
     fs.setup_mount = initramfs_setup_mount; // init func ptr
-    // BUG fs.sync??
     return register_filesystem(&fs);
 }
 

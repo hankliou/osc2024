@@ -8,7 +8,7 @@
 #define MBOX_CH_PROP 8
 
 // lab7: mailbox init
-size_t         width, height, pitch, isrgb; // dimensions & channel order
+unsigned int   width, height, pitch, isrgb; // dimensions & channel order
 unsigned char *lfb;                         // raw frame buffer addess
 
 file_operations dev_framebuffer_operation = {

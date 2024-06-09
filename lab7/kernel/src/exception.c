@@ -72,8 +72,8 @@ void el0_sync_router(trap_frame *tpf) {
         uart_sendline("Invalid System Call Number\n");
         while (1) {};
     }
-    // TODO add INT disable???
-    // el1_interrupt_disable();
+    // BUG add INT disable???
+    el1_interrupt_disable();
 }
 
 void el1h_irq_router(trap_frame *tpf) {
@@ -97,11 +97,11 @@ void el1h_irq_router(trap_frame *tpf) {
         timer_enable_interrupt(); // pospond to re-open after handling
         // at least two thread running -> schedule for any timer irq
         // BUG: 這裡 CRTAO 有disable interrupt
-        // el1_interrupt_disable();
+        el1_interrupt_disable();
         if (run_queue && run_queue->next && run_queue->next->next != run_queue) schedule();
     }
     check_signal(tpf);
-    // el1_interrupt_disable();
+    el1_interrupt_disable();
     // BUG 這裡也有disable interrupt
 }
 

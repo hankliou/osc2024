@@ -55,11 +55,11 @@ int register_dev(file_operations *fo) {
 }
 
 int vfs_mknod(char *pathname, int id) {
-    file *f; // BUG diff with sample
+    file *f = kmalloc(sizeof(file)); // TODO diff with sample
     // create leaf and its file opeations
     vfs_open(pathname, O_CREAT, &f);
     f->vnode->f_ops = &reg_dev[id];
-    // vfs_close(f); // BUG free掉不就全都白做的??
+    vfs_close(f); // TODO free掉不就全都白做的??
     return 0;
 }
 

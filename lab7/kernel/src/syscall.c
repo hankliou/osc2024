@@ -2,6 +2,7 @@
 #include "bcm2837/rpi_mbox.h"
 #include "bcm2837/rpi_mmu.h"
 #include "cpio.h"
+#include "dev_framebuffer.h"
 #include "exception.h"
 #include "mbox.h"
 #include "memory.h"
@@ -112,7 +113,7 @@ int fork(trap_frame *tpf) {
     for (int i = 0; i <= MAX_FD; i++) {
         if (get_current()->file_descriptor_table[i]) {
             child->file_descriptor_table[i] = kmalloc(sizeof(file));
-            *child->file_descriptor_table[i] = *(get_current()->file_descriptor_table[i]); // BUG 沒做lab6 advance不知道會不會動
+            *child->file_descriptor_table[i] = *(get_current()->file_descriptor_table[i]); // get val from address, copy to child
         }
     }
 
@@ -288,9 +289,8 @@ int syscall_chdir(trap_frame *tpf, const char *path) {
     return 0;
 }
 
-// TODO 這段不知道在幹嘛
 long syscall_lseek64(trap_frame *tpf, int fd, long offset, int whence) {
-    if (whence == SEEK_SET) { // used for dev_framebuffer // TODO what is dev framebuffer
+    if (whence == SEEK_SET) { // used for dev_framebuffer //TODO why seekset
         get_current()->file_descriptor_table[fd]->f_pos = offset;
         tpf->x0 = offset;
     } else // other is no supported
@@ -298,9 +298,25 @@ long syscall_lseek64(trap_frame *tpf, int fd, long offset, int whence) {
     return tpf->x0;
 }
 
-// BUG 這裡還沒寫 framebuffer related
+extern unsigned int height;
+extern unsigned int width;
+extern unsigned int pitch;
+extern unsigned int isrgb;
+// ioctl 0 will be use to get info
+// there will be default value in info
+// if it works with default value, you can ignore this syscall
 int syscall_ioctl(trap_frame *tpf, int fd, unsigned long request, void *info) {
-    return 0;
+    if (request == 0) { // used for get info (SPEC)
+        framebuffer_info *fb_info = info;
+        uart_sendline("ioctl: %x, %x, %x, %x\n", fb_info->height, fb_info->width, fb_info->pitch, fb_info->isrgb);
+        fb_info->height = height;
+        fb_info->width = width;
+        fb_info->pitch = pitch;
+        fb_info->isrgb = isrgb;
+    }
+
+    tpf->x0 = 0;
+    return tpf->x0;
 }
 
 /* components */

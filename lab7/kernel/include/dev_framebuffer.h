@@ -5,10 +5,10 @@
 #include "vfs.h"
 
 typedef struct framebuffer_info {
-    size_t width;
-    size_t height;
-    size_t pitch;
-    size_t isrgb;
+    unsigned int width;
+    unsigned int height;
+    unsigned int pitch;
+    unsigned int isrgb;
 } framebuffer_info;
 
 int init_dev_framebuffer();
