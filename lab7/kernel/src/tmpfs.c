@@ -28,7 +28,7 @@ int register_tmpfs() {
 
 int tmpfs_setup_mount(filesystem *fs, mount *mnt) {
     mnt->fs = fs;
-    mnt->root = tmpfs_create_vnode(0, dir_t);
+    mnt->root = tmpfs_create_vnode(dir_t);
     return 0;
 }
 
@@ -131,7 +131,7 @@ int tmpfs_create(vnode *dir_node, vnode **target, const char *component_name) {
         return -1;
     }
 
-    vnode *vn = tmpfs_create_vnode(0, file_t);
+    vnode *vn = tmpfs_create_vnode(file_t);
     inode->entry[child_idx] = vn;
 
     tmpfs_inode *new_inode = vn->internal;
@@ -163,7 +163,7 @@ int tmpfs_mkdir(vnode *dir_node, vnode **target, const char *component_name) {
         return -1;
     }
 
-    vnode *vn = tmpfs_create_vnode(0, dir_t);
+    vnode *vn = tmpfs_create_vnode(dir_t);
     inode->entry[child_idx] = vn;
 
     tmpfs_inode *new_inode = vn->internal;
@@ -174,7 +174,7 @@ int tmpfs_mkdir(vnode *dir_node, vnode **target, const char *component_name) {
 }
 
 // TODO mnt沒用到，要移除
-vnode *tmpfs_create_vnode(mount *mnt, fsnode_type type) {
+vnode *tmpfs_create_vnode(fsnode_type type) {
     vnode *v = kmalloc(sizeof(vnode));
     v->f_ops = &tmpfs_file_operations;
     v->v_ops = &tmpfs_vnode_operations;

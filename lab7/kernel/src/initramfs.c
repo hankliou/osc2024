@@ -74,7 +74,7 @@ int initramfs_write(file *file, const void *buf, size_t len) {
 int initramfs_read(file *file, void *buf, size_t len) {
     initramfs_inode *inode = file->vnode->internal;
 
-    // if overflow, shrink size // BUG: diff with sample
+    // if overflow, shrink size
     if (len + file->f_pos > inode->datasize) len = inode->datasize - file->f_pos;
 
     memcpy(buf, inode->data, len);

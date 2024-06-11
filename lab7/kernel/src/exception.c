@@ -46,7 +46,6 @@ void el0_sync_router(trap_frame *tpf) {
 
     el1_interrupt_enable();
     int syscall_no = tpf->x8;
-    // uart_sendline("syscall: %d\n", syscall_no); // FIXME
     if (syscall_no == 0) getpid(tpf);
     else if (syscall_no == 1) uart_read(tpf, (char *)tpf->x0, tpf->x1);
     else if (syscall_no == 2) uart_write(tpf, (char *)tpf->x0, tpf->x1);
@@ -73,7 +72,7 @@ void el0_sync_router(trap_frame *tpf) {
         while (1) {};
     }
     // BUG add INT disable???
-    el1_interrupt_disable();
+    // el1_interrupt_disable();
 }
 
 void el1h_irq_router(trap_frame *tpf) {
@@ -97,11 +96,11 @@ void el1h_irq_router(trap_frame *tpf) {
         timer_enable_interrupt(); // pospond to re-open after handling
         // at least two thread running -> schedule for any timer irq
         // BUG: 這裡 CRTAO 有disable interrupt
-        el1_interrupt_disable();
+        // el1_interrupt_disable();
         if (run_queue && run_queue->next && run_queue->next->next != run_queue) schedule();
     }
     check_signal(tpf);
-    el1_interrupt_disable();
+    // el1_interrupt_disable();
     // BUG 這裡也有disable interrupt
 }
 
