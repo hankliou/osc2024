@@ -55,11 +55,11 @@ int register_dev(file_operations *fo) {
 }
 
 int vfs_mknod(char *pathname, int id) {
-    file *f = kmalloc(sizeof(file)); // TODO diff with sample
+    file *f;
     // create leaf and its file opeations
     vfs_open(pathname, O_CREAT, &f);
     f->vnode->f_ops = &reg_dev[id];
-    vfs_close(f); // TODO free掉不就全都白做的??
+    vfs_close(f); // free the struct 'file', but struct 'vnode' still exist
     return 0;
 }
 
@@ -70,7 +70,9 @@ filesystem *find_filesystem(const char *fs_name) {
     return 0;
 }
 
-/* file ops */
+/* -------------------------------------------------------------- */
+/*                        file operations                         */
+/* -------------------------------------------------------------- */
 
 // write len byte from buf to the opened file, return written size or error code
 int vfs_write(file *file, const void *buf, size_t len) {
@@ -121,10 +123,14 @@ int vfs_close(file *file) {
     return 0;                 // return error code if fails
 }
 
+/* -------------------------------------------------------------- */
+/*                        Multi-level VFS                         */
+/* -------------------------------------------------------------- */
+
 // return 0 if success, -1 if failed
 int vfs_mkdir(const char *pathname) {
-    char dirname[MAX_PATH_NAME] = {0};    // before add folder
-    char newdirname[MAX_PATH_NAME] = {0}; // after add folder
+    char dirname[MAX_PATH_NAME] = {0};    // copy of pathname
+    char newdirname[MAX_PATH_NAME] = {0}; // last split of pathname
 
     // search for last directory
     int last_slash_idx = 0;
@@ -151,13 +157,13 @@ int vfs_mount(const char *target, const char *file_sys) {
     // search for the target filesystem
     filesystem *fs = find_filesystem(file_sys);
 
-    // if target fs not found
+    // if target fs not found (not registered)
     if (!fs) {
         uart_sendline("[vfs mount] cannot find filesystem\n");
         return -1;
     }
 
-    // if mounting dir not found
+    // if mounting dir not found (path doesn't exist)
     if (vfs_lookup(target, &dirnode) == -1) {
         uart_sendline("[vfs mount] cannot find dir\n");
         return -1;
@@ -207,7 +213,7 @@ int vfs_lookup(const char *pathname, vnode **target) {
 
 // 'path' will be written the abs_path, and will be returned
 char *get_absolute_path(char *path, char *curr_working_dir) {
-    // if relative path -> add root path
+    // if relative path -> add '/' at the beginning of 'path'
     if (path[0] != '/') {
         char tmp[MAX_PATH_NAME];
         strcpy(tmp, curr_working_dir);

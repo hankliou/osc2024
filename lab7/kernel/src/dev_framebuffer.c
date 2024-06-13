@@ -69,12 +69,12 @@ int init_dev_framebuffer() {
     // this might not return exactly what we asked for, could be
     // the closest supported resolution instead
     if (mbox_call(MBOX_TAGS_ARM_TO_VC, (unsigned int)((unsigned long)&pt)) && pt[20] == 32 && pt[28] != 0) {
-        pt[28] &= 0x3FFFFFFF; // convert GPU address to ARM address
-        width = pt[5];        // get actual physical width
-        height = pt[6];       // get actual physical height
-        pitch = pt[33];       // get number of bytes per line
-        isrgb = pt[24];       // get the actual channel order
-        lfb = PHYS2VIRT((void *)((unsigned long)pt[28]));
+        pt[28] &= 0x3FFFFFFF;                             // convert GPU address to ARM address
+        width = pt[5];                                    // get actual physical width
+        height = pt[6];                                   // get actual physical height
+        pitch = pt[33];                                   // get number of bytes per line
+        isrgb = pt[24];                                   // get the actual channel order
+        lfb = PHYS2VIRT((void *)((unsigned long)pt[28])); // pt is declaired in kernel, need to be translated
     } else {
         uart_sendline("Unable to set screen resolution to 1024x768x32\n");
     }

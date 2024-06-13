@@ -69,7 +69,7 @@ int tmpfs_close(file *file) {
     return 0;
 }
 
-// long seek 64-bit // TODO 搞清楚這FUNC再幹嘛(用不到?)
+// long seek 64-bit
 long tmpfs_lseek64(file *file, long offset, int whence) {
     if (whence == SEEK_SET) {
         file->f_pos = offset;
@@ -107,7 +107,7 @@ int tmpfs_lookup(vnode *dir_node, vnode **target, const char *component_name) {
 int tmpfs_create(vnode *dir_node, vnode **target, const char *component_name) {
     tmpfs_inode *inode = dir_node->internal;
     if (inode->type != dir_t) {
-        uart_sendline("[tmpfs create] not dir\n");
+        uart_sendline("[tmpfs create] not a dir\n");
         return -1;
     }
 
@@ -173,7 +173,6 @@ int tmpfs_mkdir(vnode *dir_node, vnode **target, const char *component_name) {
     return 0;
 }
 
-// TODO mnt沒用到，要移除
 vnode *tmpfs_create_vnode(fsnode_type type) {
     vnode *v = kmalloc(sizeof(vnode));
     v->f_ops = &tmpfs_file_operations;

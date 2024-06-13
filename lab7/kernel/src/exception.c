@@ -95,13 +95,14 @@ void el1h_irq_router(trap_frame *tpf) {
         add_irq_task(timer_handler, TIMER_IRQ_PRIORITY);
         timer_enable_interrupt(); // pospond to re-open after handling
         // at least two thread running -> schedule for any timer irq
-        // BUG: 這裡 CRTAO 有disable interrupt
+
+        // BUG: disable interrupt ???
         // el1_interrupt_disable();
         if (run_queue && run_queue->next && run_queue->next->next != run_queue) schedule();
     }
     check_signal(tpf);
+    // BUG disable interrupt????
     // el1_interrupt_disable();
-    // BUG 這裡也有disable interrupt
 }
 
 void invalid_exception_router(int no) {

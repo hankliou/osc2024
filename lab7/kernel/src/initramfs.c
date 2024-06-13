@@ -66,6 +66,7 @@ int initramfs_setup_mount(filesystem *fs, mount *mnt) {
 /* -------------------------------------------------------------- */
 /*                        file operations                         */
 /* -------------------------------------------------------------- */
+// All method like write, create, mkdir, should fail on this file system.
 int initramfs_write(file *file, const void *buf, size_t len) {
     return -1; // read only
 }
@@ -120,10 +121,11 @@ int initramfs_lookup(vnode *dir_node, vnode **target, const char *component_name
     return -1;
 }
 
+// All method like write, create, mkdir, should fail on this file system.
 int initramfs_create(vnode *dir_node, vnode **target, const char *component_name) {
     return -1; // read only
 }
-
+// All method like write, create, mkdir, should fail on this file system.
 int initramfs_mkdir(vnode *dir_node, vnode **target, const char *component_name) {
     return -1; // read only
 }

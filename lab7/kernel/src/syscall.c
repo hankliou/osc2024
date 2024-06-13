@@ -180,7 +180,9 @@ void kill(int pid) {
     schedule();
 }
 
-/* signal related functions */
+/* -------------------------------------------------------------- */
+/*                     signal related functions                   */
+/* -------------------------------------------------------------- */
 void signal_register(int signal, void (*handler)()) {
     if (signal < 0 || signal > SIGNAL_MAX) return;
     get_current()->signal_handler[signal] = handler;
@@ -203,6 +205,10 @@ void signal_return(trap_frame *tpf) {
     // load context
     load_context(&get_current()->signal_savedContext);
 }
+
+/* -------------------------------------------------------------- */
+/*                        file operations                         */
+/* -------------------------------------------------------------- */
 
 // success: return i(file_descriptor_table entry index), failed: return -1
 int syscall_open(trap_frame *tpf, const char *pathname, int flags) {
@@ -269,7 +275,7 @@ int syscall_mkdir(trap_frame *tpf, const char *pathname, unsigned mode) {
     return tpf->x0;
 }
 
-// TODO 搞清楚怎麼mount
+// SPEC: you can ignore arguments other than target (where to mount) and filesystem (fs name)
 int syscall_mount(trap_frame *tpf, const char *src, const char *target, const char *file_sys, unsigned long flags, const void *data) {
     char abs_path[MAX_PATH_NAME];
     strcpy(abs_path, target);
@@ -290,10 +296,10 @@ int syscall_chdir(trap_frame *tpf, const char *path) {
 }
 
 long syscall_lseek64(trap_frame *tpf, int fd, long offset, int whence) {
-    if (whence == SEEK_SET) { // used for dev_framebuffer //TODO why seekset
+    if (whence == SEEK_SET) { // used for dev_framebuffer
         get_current()->file_descriptor_table[fd]->f_pos = offset;
         tpf->x0 = offset;
-    } else // other is no supported
+    } else // other is not supported
         tpf->x0 = -1;
     return tpf->x0;
 }
@@ -308,7 +314,6 @@ extern unsigned int isrgb;
 int syscall_ioctl(trap_frame *tpf, int fd, unsigned long request, void *info) {
     if (request == 0) { // used for get info (SPEC)
         framebuffer_info *fb_info = info;
-        uart_sendline("ioctl: %x, %x, %x, %x\n", fb_info->height, fb_info->width, fb_info->pitch, fb_info->isrgb);
         fb_info->height = height;
         fb_info->width = width;
         fb_info->pitch = pitch;
