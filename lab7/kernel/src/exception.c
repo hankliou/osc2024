@@ -72,7 +72,7 @@ void el0_sync_router(trap_frame *tpf) {
         while (1) {};
     }
     // BUG add INT disable???
-    // el1_interrupt_disable();
+    el1_interrupt_disable();
 }
 
 void el1h_irq_router(trap_frame *tpf) {
@@ -97,12 +97,12 @@ void el1h_irq_router(trap_frame *tpf) {
         // at least two thread running -> schedule for any timer irq
 
         // BUG: disable interrupt ???
-        // el1_interrupt_disable();
+        el1_interrupt_disable();
         if (run_queue && run_queue->next && run_queue->next->next != run_queue) schedule();
     }
     check_signal(tpf);
     // BUG disable interrupt????
-    // el1_interrupt_disable();
+    el1_interrupt_disable();
 }
 
 void invalid_exception_router(int no) {
