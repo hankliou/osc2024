@@ -5,8 +5,8 @@ unsigned int vsprintf(char *dst, char *fmt, __builtin_va_list args) {
     // dst: input args buffer
     // fmt: input formatted string
     long int arg;
-    int len, sign, i;
-    char *p, *orig = dst, tmpstr[19];
+    int      len, sign, i;
+    char    *p, *orig = dst, tmpstr[19];
 
     // failsafes
     if (dst == (void *)0 || fmt == (void *)0) { return 0; }
@@ -115,16 +115,41 @@ char *strcat(char *dest, const char *src) {
     return dest;
 }
 
+char *strncat(char *dest, const char *src, int n) {
+    char *t = dest;
+    while (*t) t++;
+    while (n > 0 && *src) {
+        *t++ = *src++;
+        n--;
+    }
+    *t = '\0';
+    return dest;
+}
+
 int strcmp(const char *p1, const char *p2) {
     const unsigned char *s1 = (const unsigned char *)p1;
     const unsigned char *s2 = (const unsigned char *)p2;
-    unsigned char c1, c2;
+    unsigned char        c1, c2;
 
     do {
         c1 = (unsigned char)*s1++;
         c2 = (unsigned char)*s2++;
         if (c1 == '\0') return c1 - c2;
     } while (c1 == c2);
+    return c1 - c2;
+}
+
+int strcasecmp(const char *s1, const char *s2) {
+    char c1, c2;
+    while (1) {
+        c1 = *s1++;
+        c2 = *s2++;
+
+        if (!c1 || !c2) break;
+        if ('A' <= c1 && c1 <= 'Z') c1 |= 0x20;
+        if ('A' <= c2 && c2 <= 'Z') c2 |= 0x20;
+        if (c1 != c2) break;
+    }
     return c1 - c2;
 }
 
@@ -161,13 +186,15 @@ int strncmp(const char *s1, const char *s2, unsigned long long n) {
 }
 
 char *memcpy(void *dest, const void *src, unsigned long long len) {
-    char *d = dest;
+    char       *d = dest;
     const char *s = src;
     while (len--) { *d++ = *s++; }
     return dest;
 }
 
-char *strcpy(char *dest, const char *src) { return memcpy(dest, src, strlen(src) + 1); }
+char *strcpy(char *dest, const char *src) {
+    return memcpy(dest, src, strlen(src) + 1);
+}
 
 void *memset(void *s, int c, size_t n) {
     char *start = s;

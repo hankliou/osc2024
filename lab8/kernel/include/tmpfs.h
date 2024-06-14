@@ -31,6 +31,7 @@ long tmpfs_getsize(vnode *vn);
 int tmpfs_lookup(vnode *dir_node, vnode **target, const char *component_name);
 int tmpfs_create(vnode *dir_node, vnode **target, const char *component_name);
 int tmpfs_mkdir(vnode *dir_node, vnode **target, const char *component_name);
+int tmpfs_sync(filesystem *fs);
 
 vnode *tmpfs_create_vnode(fsnode_type type);
 

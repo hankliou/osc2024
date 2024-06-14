@@ -23,6 +23,7 @@ int register_tmpfs() {
     filesystem fs;
     fs.name = "tmpfs";
     fs.setup_mount = tmpfs_setup_mount; // point to customized mount func
+    fs.sync = tmpfs_sync;               // point to customized mount func
     return register_filesystem(&fs);
 }
 
@@ -170,6 +171,10 @@ int tmpfs_mkdir(vnode *dir_node, vnode **target, const char *component_name) {
     strcpy(new_inode->name, component_name);
 
     *target = vn;
+    return 0;
+}
+
+int tmpfs_sync(filesystem *fs) {
     return 0;
 }
 

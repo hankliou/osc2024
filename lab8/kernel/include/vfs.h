@@ -5,10 +5,14 @@
 
 #define MAX_PATH_NAME 255
 #define MAX_FD        16
-#define O_CREAT       00000100
-#define SEEK_SET      0
-#define MAX_FS_REG    0x50
-#define MAX_DEV_REG   0x10
+
+#define O_CREAT  00000100
+#define SEEK_SET 0
+#define SEEK_CUR 1
+#define SEEK_END 2
+
+#define MAX_FS_REG  0x50
+#define MAX_DEV_REG 0x10
 
 typedef enum fsnode_type {
     dir_t, //
@@ -16,28 +20,30 @@ typedef enum fsnode_type {
 } fsnode_type;
 
 typedef struct vnode {
-    struct mount *mount;            // Superblock        : represents mounted fs
-    struct vnode_operations *v_ops; // inode & dentry Ops: represents kernel methods for vnode
-    struct file_operations *f_ops;  // file Ops          : represents process methods for opened file
-    void *internal;                 // vnode itself      : directly point to fs's vnode
+    struct mount            *mount;    // Superblock        : represents mounted fs
+    struct vnode_operations *v_ops;    // inode & dentry Ops: represents kernel methods for vnode
+    struct file_operations  *f_ops;    // file Ops          : represents process methods for opened file
+    void                    *internal; // vnode itself      : directly point to fs's vnode
+    struct vnode            *parent;
 } vnode;
 
 // file handle
 typedef struct file {
-    struct vnode *vnode;
-    size_t f_pos; // R/W position of this file handle
+    struct vnode           *vnode;
+    size_t                  f_pos; // R/W position of this file handle
     struct file_operations *f_ops;
-    int flags;
+    int                     flags;
 } file;
 
 typedef struct mount {
-    struct vnode *root;
+    struct vnode      *root;
     struct filesystem *fs;
 } mount;
 
 typedef struct filesystem {
     const char *name;
     int (*setup_mount)(struct filesystem *fs, struct mount *mount);
+    int (*sync)(struct filesystem *fs);
 } filesystem;
 
 typedef struct file_operations {
@@ -53,7 +59,12 @@ typedef struct vnode_operations {
     int (*lookup)(struct vnode *dir_node, struct vnode **target, const char *component_name);
     int (*create)(struct vnode *dir_node, struct vnode **target, const char *component_name);
     int (*mkdir)(struct vnode *dir_node, struct vnode **target, const char *component_name);
+    int (*isdir)(struct vnode *dir_node);
+    int (*getname)(struct vnode *dir_node, const char **name);
+    int (*getsize)(struct vnode *dir_node);
 } vnode_operations;
+
+extern filesystem reg_fs[MAX_FS_REG];
 
 void init_rootfs();
 
@@ -68,6 +79,7 @@ int vfs_close(file *file);
 int vfs_mkdir(const char *pathname);
 int vfs_mount(const char *target, const char *file_sys);
 int vfs_lookup(const char *pathname, vnode **target);
+int vfs_sync(filesystem *fs);
 
 char *get_absolute_path(char *path, char *curr_working_dir);
 

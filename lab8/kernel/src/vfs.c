@@ -6,7 +6,7 @@
 #include "tmpfs.h"
 #include "u_string.h"
 #include "uart1.h"
-
+// TODO this file has not been updated
 mount          *rootfs;
 filesystem      reg_fs[MAX_FS_REG];
 file_operations reg_dev[MAX_DEV_REG];

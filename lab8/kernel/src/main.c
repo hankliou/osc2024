@@ -9,7 +9,7 @@
 #include "vfs.h"
 
 extern char *dtb_ptr;
-char input_buffer[CMD_MAX_LEN];
+char         input_buffer[CMD_MAX_LEN];
 
 void main(char *arg) {
     uart_init();

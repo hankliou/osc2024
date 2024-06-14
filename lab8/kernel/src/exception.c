@@ -66,6 +66,7 @@ void el0_sync_router(trap_frame *tpf) {
     else if (syscall_no == 17) syscall_chdir(tpf, (char *)tpf->x0);
     else if (syscall_no == 18) syscall_lseek64(tpf, tpf->x0, tpf->x1, tpf->x2);
     else if (syscall_no == 19) syscall_ioctl(tpf, tpf->x0, tpf->x1, (void *)tpf->x2);
+    else if (syscall_no == 20) sync(tpf);
     else if (syscall_no == 99) signal_return(tpf);
     else {
         uart_sendline("Invalid System Call Number\n");

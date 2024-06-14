@@ -27,6 +27,7 @@ int register_initramfs() {
     filesystem fs;
     fs.name = "initramfs";                  // init name
     fs.setup_mount = initramfs_setup_mount; // init func ptr
+    fs.sync = initramfs_sync;               // init func ptr
     return register_filesystem(&fs);
 }
 
@@ -128,6 +129,10 @@ int initramfs_create(vnode *dir_node, vnode **target, const char *component_name
 // All method like write, create, mkdir, should fail on this file system.
 int initramfs_mkdir(vnode *dir_node, vnode **target, const char *component_name) {
     return -1; // read only
+}
+
+int initramfs_sync(filesystem *fs) {
+    return 0;
 }
 
 vnode *initramfs_create_vnode(mount *mnt, fsnode_type type) {
