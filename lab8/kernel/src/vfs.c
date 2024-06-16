@@ -6,6 +6,7 @@
 #include "tmpfs.h"
 #include "u_string.h"
 #include "uart1.h"
+
 // TODO this file has not been updated
 mount          *rootfs;
 filesystem      reg_fs[MAX_FS_REG];
@@ -61,6 +62,10 @@ int vfs_mknod(char *pathname, int id) {
     f->vnode->f_ops = &reg_dev[id];
     vfs_close(f); // free the struct 'file', but struct 'vnode' still exist
     return 0;
+}
+
+int vfs_sync(struct filesystem *fs) {
+    return fs->sync(fs);
 }
 
 filesystem *find_filesystem(const char *fs_name) {
