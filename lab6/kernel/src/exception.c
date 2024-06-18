@@ -8,11 +8,11 @@
 #include "timer.h"
 #include "uart1.h"
 
-irq_node *irq_head; // head is empty, every node come after head
+irq_node      *irq_head; // head is empty, every node come after head
 extern thread *run_queue;
 
 static unsigned long long lock_count = 0;
-void lock() {
+void                      lock() {
     el1_interrupt_disable(); // enter critical section
     lock_count++;
 }
@@ -49,26 +49,17 @@ void el0_sync_router(trap_frame *tpf) {
     // uart_sendline("syscall: %d\n", syscall_no); // FIXME
     if (syscall_no == 0) getpid(tpf);
     // 'UART syscall' user have to allocate spaces to x0(buf) theirself
-    else if (syscall_no == 1)
-        uart_read(tpf, (char *)tpf->x0, tpf->x1);
-    else if (syscall_no == 2)
-        uart_write(tpf, (char *)tpf->x0, tpf->x1);
-    else if (syscall_no == 3)
-        exec(tpf, (char *)tpf->x0, (char **)tpf->x1);
-    else if (syscall_no == 4)
-        fork(tpf);
-    else if (syscall_no == 5)
-        exit(tpf, tpf->x0);
-    else if (syscall_no == 6)
-        syscall_mbox_call(tpf, (unsigned char)tpf->x0, (unsigned int *)tpf->x1);
-    else if (syscall_no == 7)
-        kill(tpf->x0);
-    else if (syscall_no == 8)
-        signal_register(tpf->x0, (void (*)())(tpf->x1));
-    else if (syscall_no == 9)
-        signal_kill(tpf->x0, tpf->x1);
-    else if (syscall_no == 99)
-        signal_return(tpf);
+    else if (syscall_no == 1) uart_read(tpf, (char *)tpf->x0, tpf->x1);
+    else if (syscall_no == 2) uart_write(tpf, (char *)tpf->x0, tpf->x1);
+    else if (syscall_no == 3) exec(tpf, (char *)tpf->x0, (char **)tpf->x1);
+    else if (syscall_no == 4) fork(tpf);
+    else if (syscall_no == 5) exit(tpf, tpf->x0);
+    else if (syscall_no == 6) syscall_mbox_call(tpf, (unsigned char)tpf->x0, (unsigned int *)tpf->x1);
+    else if (syscall_no == 7) kill(tpf->x0);
+    else if (syscall_no == 8) signal_register(tpf->x0, (void (*)())(tpf->x1));
+    else if (syscall_no == 9) signal_kill(tpf->x0, tpf->x1);
+    else if (syscall_no == 10) mmap(tpf, (void *)tpf->x0, tpf->x1, tpf->x2, tpf->x3, tpf->x4, tpf->x5);
+    else if (syscall_no == 99) signal_return(tpf);
     else {
         uart_sendline("Invalid System Call Number\n");
         while (1) {};

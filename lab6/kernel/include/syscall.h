@@ -55,6 +55,8 @@ void signal_register(int signal, void (*handler)());
 void signal_kill(int pid, int signal);
 void signal_return(trap_frame *tpf);
 
+void *mmap(trap_frame*tpf, void *addr, size_t len, int prot, int flags, int fd, int file_offset);
+
 // components
 unsigned int get_file_size(char *path);
 char *get_file_start(char *path);

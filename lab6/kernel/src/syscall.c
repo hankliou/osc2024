@@ -12,7 +12,7 @@
 #include "uart1.h"
 
 extern thread *run_queue;
-extern thread thread_list[PID_MAX + 1];
+extern thread  thread_list[PID_MAX + 1];
 
 extern void *CPIO_DEFAULT_START;
 
@@ -130,7 +130,9 @@ int fork(trap_frame *tpf) {
     return child->pid;
 }
 
-void exit(trap_frame *tpf, int status) { thread_exit(); }
+void exit(trap_frame *tpf, int status) {
+    thread_exit();
+}
 
 int syscall_mbox_call(trap_frame *tpf, unsigned char ch, unsigned int *mbox_user) {
     lock();
@@ -180,11 +182,40 @@ void signal_return(trap_frame *tpf) {
     load_context(&get_current()->signal_savedContext);
 }
 
+// only need to implement the anonymous page mapping in this Lab.
+// prot(access protection): 0 not accessible, 1 readable, 2 writable, 4 executable,
+void *mmap(trap_frame *tpf, void *addr, size_t len, int prot, int flags, int fd, int file_offset) {
+    uart_sendline("mmap\n");
+    len = len % 0x1000 ? len + (0x1000 - len % 0x1000) : len;                                    // align to 0x1000
+    addr = (unsigned long)addr % 0x1000 ? addr + (0x1000 - (unsigned long)addr % 0x1000) : addr; // align to 0x1000
+
+    // check if overlap
+    vm_area_struct *ptr = 0;
+    for (vm_area_struct *it = get_current()->vma_list.next; it != &get_current()->vma_list; it = it->next) {
+        // addr+len is inside virtual memory slice
+        if (!(it->virt_addr >= (unsigned long)(addr + len) || it->virt_addr + it->area_size <= (unsigned long)addr)) {
+            ptr = it;
+            break;
+        }
+    }
+
+    // memory slice overlap, try next slice
+    if (ptr) {
+        tpf->x0 = (unsigned long)mmap(tpf, (void *)(ptr->virt_addr + ptr->area_size), len, prot, flags, fd, file_offset);
+        return (void *)tpf->x0;
+    }
+
+    // no overlap, add vma
+    mmu_add_vma(get_current(), (unsigned long)addr, len, VIRT2PHYS((unsigned long)kmalloc(len)), prot, 1);
+    tpf->x0 = (unsigned long)addr;
+    return (void *)tpf->x0;
+}
+
 /* components */
 unsigned int get_file_size(char *thefilepath) {
-    char *filepath;
-    char *filedata;
-    unsigned int filesize;
+    char                    *filepath;
+    char                    *filedata;
+    unsigned int             filesize;
     struct cpio_newc_header *header_pointer = CPIO_DEFAULT_START;
 
     while (header_pointer != 0) {
@@ -197,9 +228,9 @@ unsigned int get_file_size(char *thefilepath) {
 }
 
 char *get_file_start(char *thefilepath) {
-    char *filepath;
-    char *filedata;
-    unsigned int filesize;
+    char                    *filepath;
+    char                    *filedata;
+    unsigned int             filesize;
     struct cpio_newc_header *header_pointer = CPIO_DEFAULT_START;
 
     while (header_pointer != 0) {

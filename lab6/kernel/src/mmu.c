@@ -148,7 +148,7 @@ void mmu_memfail_abort_handler(esr_el1 *esr) {
     // uart_sendline("far_el1: %x\n", far_el1);
 
     // search virt addr in va_list
-    thread *cur_thread = get_current();
+    thread         *cur_thread = get_current();
     vm_area_struct *memory = 0;
     for (vm_area_struct *it = cur_thread->vma_list.next; it != &cur_thread->vma_list; it = it->next) {
         // far_el1 is inside any node in vma_list
@@ -160,11 +160,14 @@ void mmu_memfail_abort_handler(esr_el1 *esr) {
 
     // not found in vma_list
     if (!memory) {
+        // advance 2: If the fault address is not part of any region in the process’s address space,
+        // a segmentation fault is generated, and the kernel terminates the process.
         uart_sendline("[Segmentation Fault] killing process\n");
         thread_exit();
         return;
     }
 
+    // If it’s part of one region, follow region_map but 'only map one page frame' for the fault address.
     // for translation fault(check last 6 bits), map 1 frame to the addr
     if ((esr->iss & 0x3f) == TRANS_FAULT_LEVEL0 || // lv0
         (esr->iss & 0x3f) == TRANS_FAULT_LEVEL1 || // lv1
@@ -181,8 +184,9 @@ void mmu_memfail_abort_handler(esr_el1 *esr) {
         size_t xwr_flag = 0;
         if ((memory->xwr & 0b100) == 0) xwr_flag |= PD_UXN;       // non executable
         if ((memory->xwr & 0b010) == 0) xwr_flag |= PD_RDONLY;    // non writeable
-        if ((memory->xwr & 0x001) == 1) xwr_flag |= PD_UK_ACCESS; // non redable
+        if ((memory->xwr & 0x001) == 1) xwr_flag |= PD_UK_ACCESS; // redable
 
+        // one page only !
         map_page(PHYS2VIRT(cur_thread->context.pgd), memory->virt_addr + offset, memory->phys_addr + offset, xwr_flag);
     } else {
         uart_sendline("[Segmentation Fault] killing process (else)\n");
